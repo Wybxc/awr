@@ -1,5 +1,3 @@
-ignore_merge_commits = false
-branch_whitelist = ["main"]
 pre_bump_hooks = [
     "maturin build --release",
     "echo 'bumping from {{latest}} to {{version}}'",

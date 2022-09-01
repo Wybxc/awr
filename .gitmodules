@@ -1,0 +1,3 @@
+[submodule "avilla"]
+	path = avilla
+	url = git@github.com:GraiaProject/Avilla.git
