@@ -1,0 +1,16 @@
+ignore_merge_commits = false
+branch_whitelist = ["main"]
+pre_bump_hooks = [
+    "maturin build --release",
+    "echo 'bumping from {{latest}} to {{version}}'",
+    "cargo set-version {{version}}",
+]
+post_bump_hooks = []
+
+[commit_types]
+
+[changelog]
+path = "CHANGELOG.md"
+authors = []
+
+[bump_profiles]
