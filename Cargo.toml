@@ -1,0 +1,36 @@
+[package]
+name = "awr"
+version = "0.1.0"
+authors = ["忘忧北萱草<wybxc@qq.com>"]
+license = "AGPL-3.0"
+edition = "2021"
+
+[lib]
+name = "awr"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.16", features = ["extension-module", "anyhow" ] }
+pyo3-asyncio = { version = "0.16", features = ["tokio-runtime"] }
+ricq = "0.1"
+tokio = { version = "1", features = ["rt", "fs"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+futures-util = "0.3"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3" }
+serde_json = "1"
+hex = "0.4.3"
+bytes = "1"
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+requestty = "0.4.1"
+rqrr = "0.5"
+qrcode = "0.12"
+image = "0.24"
+
+[package.metadata.maturin]
+python-source = "python"
+
+[profile.release]
+lto = true

@@ -1,0 +1,30 @@
+[project]
+name = "awr"
+version = "0.1.0"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Natural Language :: Chinese (Simplified)",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",    
+    "Topic :: Communications",
+]
+
+dependencies = [
+    "loguru==0.6.0",
+]
+
+[project.optional-dependencies]
+avilla = [
+    "avilla-core",
+    "launart",
+]
+
+
+[build-system]
+requires = ["maturin>=0.13,<0.14"]
+build-backend = "maturin"
+
+[tool.maturin]
+python-source = "python"
