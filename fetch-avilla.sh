@@ -10,4 +10,4 @@ python -m pdm mina build core -vv
 cd ..
 
 # Install avilla core
-pip install avilla/dist/avilla_core-1.0.0rc3-py3-none-any.whl
+pip install avilla/dist/avilla_core-1.0.0rc4-py3-none-any.whl
