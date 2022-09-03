@@ -1,6 +1,7 @@
 use anyhow::Result;
 use futures_util::Future;
 use pyo3::prelude::*;
+// use pyo3::types::*;
 
 /// 获取 Python 的 None。
 pub fn py_none() -> PyObject {
@@ -14,6 +15,23 @@ where
 {
     Python::with_gil(|py| Py::new(py, obj))
 }
+
+// pub fn py_list<T, C, U>(list: impl IntoIterator<Item = T, IntoIter = U>) -> PyResult<Py<PyList>>
+// where
+//     T: Into<PyClassInitializer<C>>,
+//     C: pyo3::PyClass,
+//     U: ExactSizeIterator<Item = T>,
+// {
+//     Python::with_gil(|py| {
+//         Ok(PyList::new(
+//             py,
+//             list.into_iter()
+//                 .map(|item| PyCell::new(py, item))
+//                 .collect::<Result<Vec<_>, _>>()?,
+//         )
+//         .into())
+//     })
+// }
 
 /// 构造一个 Python 的 dict。
 #[macro_export]

@@ -136,3 +136,98 @@ impl FriendGroupInfo {
         })
     }
 }
+
+/// 群信息
+#[pyclass]
+pub struct GroupInfo {
+    /// uin。参看：[#181](https://github.com/Mrs4s/MiraiGo/issues/181)
+    #[pyo3(get)]
+    pub uin: i64,
+
+    /// 群号。
+    #[pyo3(get)]
+    pub code: i64,
+
+    /// 群名称。
+    #[pyo3(get)]
+    pub name: Py<PyString>,
+
+    /// 入群公告。
+    #[pyo3(get)]
+    pub memo: Py<PyString>,
+
+    /// 群主 QQ 号。
+    #[pyo3(get)]
+    pub owner_uin: i64,
+
+    /// 群创建时间。
+    #[pyo3(get)]
+    pub group_create_time: u32,
+
+    /// 群等级。
+    #[pyo3(get)]
+    pub group_level: u32,
+
+    /// 群成员数量。
+    #[pyo3(get)]
+    pub member_count: u16,
+
+    /// 最大群成员数量。
+    #[pyo3(get)]
+    pub max_member_count: u16,
+
+    /// 是否开启全员禁言。
+    #[pyo3(get)]
+    pub mute_all: bool,
+
+    /// 被禁言剩余时间，单位秒。
+    #[pyo3(get)]
+    pub my_shut_up_timestamp: i64,
+
+    #[pyo3(get)]
+    pub last_msg_seq: i64,
+}
+
+impl From<ricq::structs::GroupInfo> for GroupInfo {
+    fn from(info: ricq::structs::GroupInfo) -> Self {
+        GroupInfo {
+            uin: info.uin,
+            code: info.code,
+            name: py_str!(&info.name),
+            memo: py_str!(&info.memo),
+            owner_uin: info.owner_uin,
+            group_create_time: info.group_create_time,
+            group_level: info.group_level,
+            member_count: info.member_count,
+            max_member_count: info.max_member_count,
+            mute_all: info.shut_up_timestamp != 0,
+            my_shut_up_timestamp: info.my_shut_up_timestamp,
+            last_msg_seq: info.last_msg_seq,
+        }
+    }
+}
+
+#[pymethods]
+impl GroupInfo {
+    fn __repr__(&self) -> String {
+        Python::with_gil(|py| {
+            format!(
+                "GroupInfo(uin={}, code={}, name={}, memo={}, owner_uin={}, group_create_time={}, \
+                    group_level={}, member_count={}, max_member_count={}, mute_all={}, \
+                    my_shut_up_timestamp={}, last_msg_seq={})",
+                self.uin,
+                self.code,
+                self.name.as_ref(py).repr().unwrap(),
+                self.memo.as_ref(py).repr().unwrap(),
+                self.owner_uin,
+                self.group_create_time,
+                self.group_level,
+                self.member_count,
+                self.max_member_count,
+                self.mute_all,
+                self.my_shut_up_timestamp,
+                self.last_msg_seq
+            )
+        })
+    }
+}

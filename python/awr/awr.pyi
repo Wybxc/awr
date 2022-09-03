@@ -1,4 +1,4 @@
-from typing import Any, Iterator, Literal
+from typing import Any, Iterator, Literal, Sequence
 
 ################################################################################
 # lib.rs
@@ -100,6 +100,16 @@ class Client:
         """获取账号信息。"""
     async def get_friend_list(self) -> FriendList:
         """获取好友列表。"""
+    async def get_group_info(self, group_id: int) -> GroupInfo | None:
+        """获取群信息。"""
+    async def get_group_infos(self, group_ids: Sequence[int]) -> dict[int, GroupInfo]:
+        """批量获取群信息，返回 `{ 群号: 群信息 }` 的字典。"""
+    async def get_group_list(self) -> list[GroupInfo]:
+        """获取群列表。
+        
+        # Note
+        此方法获取到的 `last_msg_seq` 不可用，如需要此字段请使用 `get_group_info`。
+        """
 
 ################################################################################
 # client/structs.rs
@@ -153,6 +163,46 @@ class FriendGroupInfo:
         """在线好友数量。"""
     @property
     def seq_id(self) -> int:
+        """"""
+
+class GroupInfo:
+    """群信息。"""
+
+    @property
+    def uin(self) -> int:
+        """uin。参看：[#181](https://github.com/Mrs4s/MiraiGo/issues/181)"""
+    @property
+    def code(self) -> int:
+        """群号。"""
+    @property
+    def name(self) -> str:
+        """群名。"""
+    @property
+    def memo(self) -> str:
+        """入群公告。"""
+    @property
+    def owner_uin(self) -> int:
+        """群主 QQ 号。"""
+    @property
+    def group_create_time(self) -> int:
+        """群创建时间。"""
+    @property
+    def group_level(self) -> int:
+        """群等级。"""
+    @property
+    def member_count(self) -> int:
+        """群成员数量。"""
+    @property
+    def max_member_count(self) -> int:
+        """群最大成员数量。"""
+    @property
+    def mute_all(self) -> bool:
+        """是否全员禁言。"""
+    @property
+    def my_shut_up_timestamp(self) -> int:
+        """自己被禁言剩余时间。"""
+    @property
+    def last_msg_seq(self) -> int:
         """"""
 
 ################################################################################

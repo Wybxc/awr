@@ -1,6 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::*};
 
 use tokio::task::JoinHandle;
 
@@ -118,6 +118,64 @@ impl Client {
                 online_count,
             };
             Ok(py_obj(friend_list)?)
+        })
+    }
+
+    /// 获取群信息。
+    pub fn get_group_info<'py>(&self, py: Python<'py>, group_id: i64) -> PyResult<&'py PyAny> {
+        let client = self.client.clone();
+        py_future(py, async move {
+            if let Some(info) = client.get_group_info(group_id).await? {
+                let info: GroupInfo = info.into();
+                Ok(Some(py_obj(info)?))
+            } else {
+                Ok(None)
+            }
+        })
+    }
+
+    /// 批量获取群信息，返回 `{ 群号: 群信息 }` 的字典。
+    pub fn get_group_infos<'py>(
+        &self,
+        py: Python<'py>,
+        group_ids: Vec<i64>,
+    ) -> PyResult<&'py PyAny> {
+        let client = self.client.clone();
+        py_future(py, async move {
+            let infos = client.get_group_infos(group_ids).await?;
+            let infos = infos
+                .into_iter()
+                .map(|info| -> (i64, GroupInfo) { (info.code, info.into()) });
+            Ok(Python::with_gil(|py| -> PyResult<PyObject> {
+                let dict = PyDict::new(py);
+                for (key, value) in infos {
+                    dict.set_item(key, PyCell::new(py, value)?).unwrap();
+                }
+                Ok(dict.into_py(py))
+            })?)
+        })
+    }
+
+    /// 获取群列表。
+    ///
+    /// # Note
+    /// 此方法获取到的 `last_msg_seq` 不可用，如需要此字段请使用 [`get_group_info`](crate::client::Client::get_group_info)。    
+    pub fn get_group_list<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        let client = self.client.clone();
+        py_future(py, async move {
+            let group_list = client.get_group_list().await?;
+            let group_list = group_list
+                .into_iter()
+                .map(|info| -> GroupInfo { info.into() });
+            Ok(Python::with_gil(|py| -> PyResult<PyObject> {
+                let list = PyList::new(
+                    py,
+                    group_list
+                        .map(|info| PyCell::new(py, info))
+                        .collect::<Result<Vec<_>, _>>()?,
+                );
+                Ok(list.into_py(py))
+            })?)
         })
     }
 }

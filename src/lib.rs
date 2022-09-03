@@ -1,11 +1,13 @@
+#![allow(clippy::borrow_deref_ref)]  // TODO: Remove this line when pyo3-asyncio is updated to 0.17
+
 use pyo3::prelude::*;
 
 use tracing::info;
 
-mod client;
-mod device;
-mod login;
-mod loguru;
+pub mod client;
+pub mod device;
+pub mod login;
+pub mod loguru;
 mod utils;
 
 const LOGO: &str = r#"
