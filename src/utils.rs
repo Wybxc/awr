@@ -35,6 +35,7 @@ where
 
 /// 构造一个 Python 的 dict。
 #[macro_export]
+#[doc(hidden)]
 macro_rules! py_dict {
     ($py:expr, $($name:expr => $value:expr),*) => {
         [$(($name, $value),)*].into_py_dict($py)
@@ -43,6 +44,7 @@ macro_rules! py_dict {
 
 /// 等价于 `Some(py_dict!(..))`，用于指定 kwargs。
 #[macro_export]
+#[doc(hidden)]
 macro_rules! kwargs {
     ($py:expr, $($name:expr => $value:expr),*) => {
         Some($crate::py_dict!($py, $($name => $value),*))
@@ -51,6 +53,7 @@ macro_rules! kwargs {
 
 /// 创建 Python 字符串（有缓存）。
 #[macro_export]
+#[doc(hidden)]
 macro_rules! py_intern {
     ($s:expr) => {
         Python::with_gil(|py| ::pyo3::types::PyString::intern(py, $s).into_py(py))
@@ -59,6 +62,7 @@ macro_rules! py_intern {
 
 /// 创建 Python 字符串（无缓存）。
 #[macro_export]
+#[doc(hidden)]
 macro_rules! py_str {
     ($s:expr) => {
         Python::with_gil(|py| ::pyo3::types::PyString::new(py, $s).into_py(py))

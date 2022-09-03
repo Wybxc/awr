@@ -9,7 +9,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 use crate::py_dict;
 
 /// 初始化日志输出。
-pub fn init(module: &PyModule) -> PyResult<()> {
+pub(crate) fn init(module: &PyModule) -> PyResult<()> {
     // 输出桥接
     let layer = LoguruLayer::new()?;
     tracing_subscriber::registry()
@@ -31,13 +31,13 @@ pub fn init(module: &PyModule) -> PyResult<()> {
 }
 
 /// 将 [`tracing`] 的输出桥接到 Python 的 Loguru 中。
-pub struct LoguruLayer {
+pub(crate) struct LoguruLayer {
     log_fn: PyObject,
 }
 
 impl LoguruLayer {
     /// 创建一个新的 LoguruLayer 对象。
-    pub fn new() -> Result<Self, PyErr> {
+    pub(crate) fn new() -> Result<Self, PyErr> {
         let log_fn = Python::with_gil(|py| -> PyResult<PyObject> {
             let loguru = py.import("loguru")?;
             let logger = loguru.getattr("logger")?;
@@ -131,6 +131,7 @@ impl tracing::field::Visit for LoguruVisiter {
 
 #[pyclass]
 #[derive(Clone)]
+#[doc(hidden)]
 pub struct FakePyFrame {
     #[pyo3(get)]
     f_globals: Py<PyDict>,
@@ -141,6 +142,7 @@ pub struct FakePyFrame {
 }
 
 #[pyclass]
+#[doc(hidden)]
 pub struct FakePyCode {
     #[pyo3(get)]
     co_filename: Py<PyString>,
@@ -170,6 +172,7 @@ impl FakePyFrame {
 
 #[pyfunction]
 #[pyo3(name = "_getframe")]
+#[doc(hidden)]
 pub fn getframe(py: Python, depth: usize) -> PyResult<FakePyFrame> {
     let frames: &PyList = py
         .import("inspect")?

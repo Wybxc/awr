@@ -1,3 +1,35 @@
+//! 账号登录。
+//!
+//! 首先构造 [`LoginMethod`] 的子类实例，然后调用其 [`login`] 方法进行登录。
+//!
+//! [`login`] 方法接受 QQ 号和配置文件目录两个参数，返回 [`Client`] 实例。登录完成后，账户的必要信息将会保存在
+//! `配置文件目录/QQ号/` 文件夹下，以便下次登录时使用。
+//!
+//! 部分登录方式可以指定使用的协议。可用的协议包括：
+//!
+//! | 协议 | 说明 |
+//! | --- | --- |
+//! | `ipad` | iPad 协议 |
+//! | `android` | Android 手机协议 |
+//! | `watch` | Android 手表协议 |
+//! | `macos` | MacOS 客户端协议 |
+//! | `qidian` | 企点协议 |
+//!
+//! 更多信息参考 [`Password`]、[`QrCode`]、[`Dynamic`]。
+//!
+//! # Examples
+//! ```python
+//! ## 密码登录
+//! client = awr.Password("awwwwwwwwr").login(12345678, "./bots")
+//! ## 扫码登录（手表协议）
+//! client = awr.QrCode().login(12345678, "./bots")
+//! ## 动态选择登录方式
+//! client = awr.Dynamic().login(12345678, "./bots")
+//! ```
+//!
+//! [`login`]: LoginMethod::login
+//! [`Client`]: crate::client::Client
+
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -57,7 +89,12 @@ impl LoginMethod {
     /// # Arguments
     /// - `uin` - 用户的 QQ 号。
     /// - `data_folder` - 数据目录。
-    fn login<'py>(&self, uin: i64, data_folder: PathBuf) -> PyResult<&'py PyAny> {
+    ///
+    /// # Python
+    /// ```python
+    /// async def login(self, uin: int, data_folder: str) -> Client: ...
+    /// ```
+    pub fn login<'py>(&self, uin: i64, data_folder: PathBuf) -> PyResult<&'py PyAny> {
         let _ = (uin, data_folder);
         Err(anyhow!("未实现"))?
     }
@@ -78,9 +115,18 @@ impl Password {
     /// - `password` - 密码。
     /// - `protocol` - 客户端协议。
     /// - `md5` - 是否用密码的 MD5 代替密码。
+    ///
+    /// # Python
+    /// ```python
+    /// def __init__(self, password: str, protocol: str = "ipad", md5: bool = False) -> None: ...
+    /// ```
     #[new]
     #[args(protocol = "\"ipad\".to_string()", md5 = "false")]
-    fn new(password: String, protocol: String, md5: bool) -> PyResult<PyClassInitializer<Self>> {
+    pub fn new(
+        password: String,
+        protocol: String,
+        md5: bool,
+    ) -> PyResult<PyClassInitializer<Self>> {
         Ok(PyClassInitializer::from(LoginMethod::new(protocol)?)
             .add_subclass(Self { password, md5 }))
     }
@@ -90,7 +136,12 @@ impl Password {
     /// # Arguments
     /// - `uin` - 用户的 QQ 号。
     /// - `data_folder` - 数据目录。
-    fn login<'py>(
+    ///
+    /// # Python
+    /// ```python
+    /// async def login(self, uin: int, data_folder: str) -> Client: ...
+    /// ```
+    pub fn login<'py>(
         self_: PyRef<'py, Self>,
         py: Python<'py>,
         uin: i64,
@@ -128,8 +179,13 @@ impl QrCode {
     ///
     /// # Arguments
     /// - `protocol` - 客户端协议。
+    ///
+    /// # Python
+    /// ```python
+    /// def __init__(self) -> None: ...
+    /// ```
     #[new]
-    fn new() -> PyResult<PyClassInitializer<Self>> {
+    pub fn new() -> PyResult<PyClassInitializer<Self>> {
         Ok(PyClassInitializer::from(LoginMethod::new("watch".to_string())?).add_subclass(Self {}))
     }
 
@@ -138,7 +194,12 @@ impl QrCode {
     /// # Arguments
     /// - `uin` - 用户的 QQ 号。
     /// - `data_folder` - 数据目录。
-    fn login<'py>(
+    ///
+    /// # Python
+    /// ```python
+    /// async def login(self, uin: int, data_folder: str) -> Client: ...
+    /// ```
+    pub fn login<'py>(
         self_: PyRef<'py, Self>,
         py: Python<'py>,
         uin: i64,
@@ -165,6 +226,8 @@ impl QrCode {
 }
 
 /// 运行时选择登录方式。
+///
+/// 运行时将在**终端**中由用户选择登录方式。
 #[pyclass(extends=LoginMethod)]
 pub struct Dynamic {
     protocol_override: bool,
@@ -176,9 +239,14 @@ impl Dynamic {
     ///
     /// # Arguments
     /// - `protocol` - 客户端协议（可选）。
+    ///
+    /// # Python
+    /// ```python
+    /// def __init__(self, protocol: str | None = None) -> None: ...
+    /// ```
     #[new]
     #[args(protocol = "None")]
-    fn new(protocol: Option<String>) -> PyResult<PyClassInitializer<Self>> {
+    pub fn new(protocol: Option<String>) -> PyResult<PyClassInitializer<Self>> {
         Ok(if let Some(protocol) = protocol {
             PyClassInitializer::from(LoginMethod::new(protocol)?).add_subclass(Self {
                 protocol_override: false,
@@ -195,7 +263,12 @@ impl Dynamic {
     /// # Arguments
     /// - `uin` - 用户的 QQ 号。
     /// - `data_folder` - 数据目录。
-    fn login<'py>(
+    ///
+    /// # Python
+    /// ```python
+    /// async def login(self, uin: int, data_folder: str) -> Client: ...
+    /// ```
+    pub fn login<'py>(
         self_: PyRef<'py, Self>,
         py: Python<'py>,
         uin: i64,
@@ -521,7 +594,11 @@ async fn qrcode_login(client: &Client, uin: i64) -> Result<()> {
     Ok(())
 }
 
-pub async fn reconnect(client: &Arc<Client>, data_folder: &Path) -> Result<Option<JoinHandle<()>>> {
+/// 断线重连。
+pub(crate) async fn reconnect(
+    client: &Arc<Client>,
+    data_folder: &Path,
+) -> Result<Option<JoinHandle<()>>> {
     retry(
         10,
         || async {

@@ -94,6 +94,8 @@ class Client:
 
         多次调用此方法时，后续的调用将直接返回。
         """
+    def uin(self) -> int:
+        """获取客户端 QQ 号。"""
     def online(self) -> bool:
         """是否在线。"""
     async def account_info(self) -> AccountInfo:
@@ -106,7 +108,7 @@ class Client:
         """批量获取群信息，返回 `{ 群号: 群信息 }` 的字典。"""
     async def get_group_list(self) -> list[GroupInfo]:
         """获取群列表。
-        
+
         # Note
         此方法获取到的 `last_msg_seq` 不可用，如需要此字段请使用 `get_group_info`。
         """
@@ -170,7 +172,9 @@ class GroupInfo:
 
     @property
     def uin(self) -> int:
-        """uin。参看：[#181](https://github.com/Mrs4s/MiraiGo/issues/181)"""
+        """uin。
+
+        含义可参考：[#181](https://github.com/Mrs4s/MiraiGo/issues/181)。"""
     @property
     def code(self) -> int:
         """群号。"""
@@ -211,6 +215,12 @@ class GroupInfo:
 class FriendList:
     """好友列表。"""
 
+    @property
+    def total_count(self) -> int:
+        """好友数量。"""
+    @property
+    def online_count(self) -> int:
+        """在线好友数量。"""
     def friends(self) -> Iterator[FriendInfo]:
         """遍历好友信息的迭代器。"""
     def find_friend(self, uin: int) -> FriendInfo | None:

@@ -53,9 +53,11 @@ macro_rules! parse {
 /// # Arguments
 /// - `json` - `device.json` 的内容。
 /// - `fallback` - 某一项不存在时的默认值。
-pub fn from_json(json: &str, fallback: &Device) -> Result<Device> {
+pub(crate) fn from_json(json: &str, fallback: &Device) -> Result<Device> {
     let json: Value = serde_json::from_str(json)?;
-    let json = json.as_object().ok_or_else(|| anyhow!("`device.json` 格式错误"))?;
+    let json = json
+        .as_object()
+        .ok_or_else(|| anyhow!("`device.json` 格式错误"))?;
     // 查看版本
     let version = json
         .get("deviceInfoVersion")
@@ -79,7 +81,7 @@ pub fn from_json(json: &str, fallback: &Device) -> Result<Device> {
 }
 
 /// 以 QQ 号为种子生成随机的设备信息。
-pub fn random_from_uin(uin: i64) -> Device {
+pub(crate) fn random_from_uin(uin: i64) -> Device {
     let mut seed = ChaCha8Rng::seed_from_u64(uin as u64);
     Device::random_with_rng(&mut seed)
 }
@@ -122,7 +124,7 @@ macro_rules! dump {
 }
 
 /// 将设备信息写入 `device.json`。
-pub fn to_json(device: &Device) -> Result<String> {
+pub(crate) fn to_json(device: &Device) -> Result<String> {
     let mut json = Map::new();
     json.insert("deviceInfoVersion".into(), Value::Number(2.into()));
     json.insert("data".into(), {
@@ -235,7 +237,9 @@ impl Parse<String> for V2 {
     ) -> Result<String> {
         json.get(key)
             .map(|v| -> Result<String> {
-                Ok(v.as_str().ok_or_else(|| anyhow!("`{}` 格式错误", key))?.to_string())
+                Ok(v.as_str()
+                    .ok_or_else(|| anyhow!("`{}` 格式错误", key))?
+                    .to_string())
             })
             .unwrap_or_else(|| Ok(fallback()))
     }

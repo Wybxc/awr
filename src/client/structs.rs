@@ -3,6 +3,17 @@ use pyo3::{prelude::*, types::*};
 use crate::py_str;
 
 /// 账号信息。
+///
+/// # Python
+/// ```python
+/// class AccountInfo:
+///     @property
+///     def nickname(self) -> str: ...
+///     @property
+///     def age(self) -> int: ...
+///     @property
+///     def gender(self) -> int: ...
+/// ```
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct AccountInfo {
@@ -34,6 +45,21 @@ impl AccountInfo {
 }
 
 /// 好友信息。
+///
+/// # Python
+/// ```python
+/// class FriendInfo:
+///     @property
+///     def uin(self) -> int: ...
+///     @property
+///     def nickname(self) -> str: ...
+///     @property
+///     def remark(self) -> str: ...
+///     @property
+///     def face_id(self) -> int: ...
+///     @property
+///     def group_id(self) -> int: ...
+/// ```
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct FriendInfo {
@@ -49,6 +75,7 @@ pub struct FriendInfo {
     #[pyo3(get)]
     pub remark: Py<PyString>,
 
+    /// TODO: 未知。
     #[pyo3(get)]
     pub face_id: i16,
 
@@ -86,6 +113,21 @@ impl FriendInfo {
 }
 
 /// 好友分组信息。
+///
+/// # Python
+/// ```python
+/// class FriendGroupInfo:
+///     @property
+///     def id(self) -> int: ...
+///     @property
+///     def name(self) -> str: ...
+///     @property
+///     def friend_count(self) -> int: ...
+///     @property
+///     def online_count(self) -> int: ...
+///     @property
+///     def seq_id(self) -> int: ...
+/// ```
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct FriendGroupInfo {
@@ -105,6 +147,7 @@ pub struct FriendGroupInfo {
     #[pyo3(get)]
     pub online_count: i32,
 
+    /// TODO: 未知。
     #[pyo3(get)]
     pub seq_id: u8,
 }
@@ -137,10 +180,41 @@ impl FriendGroupInfo {
     }
 }
 
-/// 群信息
+/// 群信息。
+///
+/// # Python
+/// ```python
+/// class GroupInfo:
+///     @property
+///     def uin(self) -> int: ...
+///     @property
+///     def code(self) -> int: ...
+///     @property
+///     def name(self) -> str: ...
+///     @property
+///     def memo(self) -> str: ...
+///     @property
+///     def owner_uin(self) -> int: ...
+///     @property
+///     def group_create_time(self) -> int: ...
+///     @property
+///     def group_level(self) -> int: ...
+///     @property
+///     def member_count(self) -> int: ...
+///     @property
+///     def max_member_count(self) -> int: ...
+///     @property
+///     def mute_all(self) -> bool: ...
+///     @property
+///     def my_shut_up_timestamp(self) -> int: ...
+///     @property
+///     def last_msg_seq(self) -> int: ...
+/// ```
 #[pyclass]
 pub struct GroupInfo {
-    /// uin。参看：[#181](https://github.com/Mrs4s/MiraiGo/issues/181)
+    /// uin。
+    ///
+    /// 含义可参考：[#181](https://github.com/Mrs4s/MiraiGo/issues/181)。
     #[pyo3(get)]
     pub uin: i64,
 
@@ -184,6 +258,7 @@ pub struct GroupInfo {
     #[pyo3(get)]
     pub my_shut_up_timestamp: i64,
 
+    /// TODO: 未知。
     #[pyo3(get)]
     pub last_msg_seq: i64,
 }
