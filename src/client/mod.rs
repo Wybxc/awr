@@ -2,23 +2,27 @@
 //!
 //! 更多信息参考 [`Client`]。
 
-use std::{path::PathBuf, sync::Arc};
+use std::{ops::DerefMut, path::PathBuf, sync::Arc, time::Duration};
 
+use anyhow::Result;
 use pyo3::{prelude::*, types::*};
-
 use tokio::task::JoinHandle;
 
-mod friend_list;
-mod structs;
-
-pub use friend_list::FriendList;
-pub use structs::*;
+pub mod account_info;
+pub mod friend;
+pub mod friend_group;
+pub mod friend_list;
+pub mod group;
 
 use crate::{
     login::reconnect,
     py_intern,
     utils::{py_future, py_none, py_obj},
 };
+
+use self::{account_info::AccountInfo, friend_list::FriendList, group::Group};
+
+pub(crate) type ClientImpl = Arc<ricq::Client>;
 
 /// QQ 无头客户端。
 ///
@@ -39,15 +43,16 @@ use crate::{
 /// ```
 #[pyclass]
 pub struct Client {
-    client: Arc<ricq::Client>,
+    client: ClientImpl,
     alive: Option<JoinHandle<()>>,
     uin: i64,
     data_folder: PathBuf,
+    friend_list: Arc<Cached<FriendList>>,
 }
 
 impl Client {
     pub(crate) async fn new(
-        client: Arc<ricq::Client>,
+        client: ClientImpl,
         alive: JoinHandle<()>,
         data_folder: PathBuf,
     ) -> Self {
@@ -57,6 +62,7 @@ impl Client {
             alive: Some(alive),
             uin,
             data_folder,
+            friend_list: Cached::new(Duration::from_secs(3600)),
         }
     }
 }
@@ -100,18 +106,20 @@ impl Client {
         })
     }
 
-    /// 获取客户端 QQ 号。
+    /// 客户端 QQ 号。
     ///
     /// # Examples
     /// ```python
     /// client = await awr.Dynamic().login(12345678, "./bots")
-    /// assert client.uin() == 12345678
+    /// assert client.uin == 12345678
     /// ```
     ///
     /// # Python
     /// ```python
+    /// @property
     /// def uin(self) -> int: ...
     /// ```
+    #[getter]
     pub fn uin(&self) -> i64 {
         self.uin
     }
@@ -122,7 +130,7 @@ impl Client {
     /// ```python
     /// def is_online(self) -> bool: ...
     /// ```
-    pub fn online(&self) -> bool {
+    pub fn is_online(&self) -> bool {
         self.client
             .online
             .load(std::sync::atomic::Ordering::Acquire)
@@ -134,7 +142,7 @@ impl Client {
     ///
     /// # Examples
     /// ```python
-    /// info = await client.account_info()
+    /// info = await client.get_account_info()
     /// print("nickname:", info.nickname)
     /// print("age:", info.age)
     /// print("gender:", info.gender)
@@ -142,9 +150,9 @@ impl Client {
     ///
     /// # Python
     /// ```python
-    /// async def account_info(self) -> AccountInfo: ...
+    /// async def get_account_info(self) -> AccountInfo: ...
     /// ```
-    pub fn account_info<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+    pub fn get_account_info<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
         py_future(py, async move {
             let info = client.account_info.read().await;
@@ -174,90 +182,136 @@ impl Client {
     /// ```
     pub fn get_friend_list<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
+        let friend_list = self.friend_list.clone();
         py_future(py, async move {
-            let friend_list = client.get_friend_list().await?;
-            let friends = friend_list
-                .friends
-                .into_iter()
-                .map(|info| info.into())
-                .collect();
-            let friend_groups = friend_list
-                .friend_groups
-                .into_iter()
-                .map(|(key, info)| (key, info.into()))
-                .collect();
-            let total_count = friend_list.total_count;
-            let online_count = friend_list.online_friend_count;
-            let friend_list = FriendList {
-                friends,
-                friend_groups,
-                total_count,
-                online_count,
-            };
+            let friend_list = { friend_list.get(client).await? };
             Ok(py_obj(friend_list)?)
         })
     }
 
-    /// 获取群信息。
+    /// 获取遍历好友信息的迭代器。
     ///
-    /// 参考 [`GroupInfo`]。
+    /// 参考 [`Friend`]。
     ///
     /// # Examples
-    /// ```python
-    /// group_info = await client.get_group_info(12345678)
-    /// print(group_info.name)
+    /// ```python    
+    /// for friend in await client.get_friends():
+    ///     print(friend.nickname)
     /// ```
     ///
     /// # Python
     /// ```python
-    /// async def group_info(self, group_id: int) -> GroupInfo: ...
+    /// async def get_friends(self) -> Iterator[Friend]:
     /// ```
-    pub fn get_group_info<'py>(&self, py: Python<'py>, group_id: i64) -> PyResult<&'py PyAny> {
+    ///
+    /// [`Friend`]: friend::Friend
+    pub fn get_friends<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        let client = self.client.clone();
+        let friend_list = self.friend_list.clone();
+        py_future(py, async move {
+            let friend_list = { friend_list.get(client).await? };
+            let friends = Python::with_gil(|py| -> PyResult<PyObject> {
+                Ok(FriendList::friends(Py::new(py, friend_list)?, py).into_py(py))
+            })?;
+            Ok(friends)
+        })
+    }
+
+    /// 查找指定的好友。
+    ///
+    /// 参考 [`Friend`]。
+    ///
+    /// # Examples
+    /// ```python    
+    /// friend = await client.get_friend(12345678)
+    /// if friend:
+    ///     print(friend.nickname)
+    /// else:
+    ///     print("未找到好友 12345678")
+    /// ```
+    ///
+    /// # Python
+    /// ```python
+    /// async def get_friend(self, uin: int) -> Friend | None:
+    /// ```
+    ///
+    /// [`Friend`]: friend::Friend
+    pub fn get_friend<'py>(&self, py: Python<'py>, uin: i64) -> PyResult<&'py PyAny> {
+        let client = self.client.clone();
+        let friend_list = self.friend_list.clone();
+        py_future(py, async move {
+            let friend_list = { friend_list.get(client).await? };
+            let friend = friend_list.find_friend(uin);
+            Ok(match friend {
+                Some(friend) => Some(py_obj(friend)?),
+                None => None,
+            })
+        })
+    }
+
+    /// 获取群。
+    ///
+    /// 参考 [`Group`]。
+    ///
+    /// # Examples
+    /// ```python
+    /// group = await client.get_group(12345678)
+    /// print(group.name)
+    /// ```
+    ///
+    /// # Python
+    /// ```python
+    /// async def get_group(self, group_id: int) -> Group: ...
+    /// ```
+    pub fn get_group<'py>(&self, py: Python<'py>, group_id: i64) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
         py_future(py, async move {
             if let Some(info) = client.get_group_info(group_id).await? {
-                let info: GroupInfo = info.into();
-                Ok(Some(py_obj(info)?))
+                let group = Group { client, info };
+                Ok(Some(py_obj(group)?))
             } else {
                 Ok(None)
             }
         })
     }
 
-    /// 批量获取群信息，返回 `{ 群号: 群信息 }` 的字典。
+    /// 批量获取群，返回 `{ 群号: 群对象 }` 的字典。
     ///
     /// 当给出的群号不存在，或者未加入这个群时，将不会在返回值中出现。这意味着返回值长度可能会小于参数长度。
     ///
-    /// 参考 [`GroupInfo`]。
+    /// 参考 [`Group`]。
     ///
     /// # Examples
     /// ```python
-    /// group_infos = await client.get_group_info_list([12345678, 87654321])
-    /// if 12345678 in group_infos:
-    ///     print(group_infos[12345678].name)
+    /// groups = await client.get_groups([12345678, 87654321])
+    /// if 12345678 in groups:
+    ///     print(groups[12345678].name)
     /// else:
     ///     print("未加入群 12345678 或群不存在")
     /// ```
     ///
     /// # Python
     /// ```python
-    /// async def group_info_list(self, group_ids: Sequence[int]) -> dict[int, GroupInfo]: ...
+    /// async def get_groups(self, group_ids: Sequence[int]) -> dict[int, Group]: ...
     /// ```
-    pub fn get_group_infos<'py>(
-        &self,
-        py: Python<'py>,
-        group_ids: Vec<i64>,
-    ) -> PyResult<&'py PyAny> {
+    pub fn get_groups<'py>(&self, py: Python<'py>, group_ids: Vec<i64>) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
         py_future(py, async move {
             let infos = client.get_group_infos(group_ids).await?;
-            let infos = infos
-                .into_iter()
-                .map(|info| -> (i64, GroupInfo) { (info.code, info.into()) });
+            let infos = infos.into_iter().map(|info| (info.code, info));
             Ok(Python::with_gil(|py| -> PyResult<PyObject> {
                 let dict = PyDict::new(py);
-                for (key, value) in infos {
-                    dict.set_item(key, PyCell::new(py, value)?).unwrap();
+                for (key, info) in infos {
+                    dict.set_item(
+                        key,
+                        PyCell::new(
+                            py,
+                            Group {
+                                client: client.clone(),
+                                info,
+                            },
+                        )?,
+                    )?;
                 }
                 Ok(dict.into_py(py))
             })?)
@@ -266,7 +320,7 @@ impl Client {
 
     /// 获取群列表。
     ///
-    /// 参考 [`GroupInfo`]。
+    /// 参考 [`Group`]。
     ///
     /// # Examples
     /// ```python
@@ -276,19 +330,23 @@ impl Client {
     /// ```
     ///
     /// # Note
-    /// 此方法获取到的 `last_msg_seq` 不可用，如需要此字段请使用 [`get_group_info`](crate::client::Client::get_group_info)。
+    /// 此方法获取到的 `last_msg_seq` 不可用，如需要此字段请使用 [`get_group`] 或 [`get_groups`]。
     ///
     /// # Python
     /// ```python
-    /// async def get_group_list() -> list[GroupInfo]: ...
+    /// async def get_group_list() -> list[Group]: ...
     /// ```
+    ///
+    /// [`get_group`]: crate::client::Client::get_group
+    /// [`get_groups`]: crate::client::Client::get_groups
     pub fn get_group_list<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
         py_future(py, async move {
             let group_list = client.get_group_list().await?;
-            let group_list = group_list
-                .into_iter()
-                .map(|info| -> GroupInfo { info.into() });
+            let group_list = group_list.into_iter().map(|info| Group {
+                client: client.clone(),
+                info,
+            });
             Ok(Python::with_gil(|py| -> PyResult<PyObject> {
                 let list = PyList::new(
                     py,
@@ -299,5 +357,47 @@ impl Client {
                 Ok(list.into_py(py))
             })?)
         })
+    }
+}
+
+use async_trait::async_trait;
+use tokio::{sync::Mutex, time::Instant};
+
+/// 缓存。
+struct Cached<T: Cacheable> {
+    last_updated_value: Mutex<(Option<T>, Instant)>,
+    duration: Duration,
+}
+
+/// 可缓存的值。
+#[async_trait]
+pub(crate) trait Cacheable: Clone {
+    /// 从远程获取值。
+    async fn fetch(client: ClientImpl) -> Result<Self>;
+}
+
+impl<T: Cacheable> Cached<T> {
+    /// 创建一个新的缓存。
+    ///
+    /// # Arguments
+    /// * `duration` - 缓存时长。
+    fn new(duration: Duration) -> Arc<Self> {
+        Arc::new(Self {
+            last_updated_value: Mutex::new((None, Instant::now())),
+            duration,
+        })
+    }
+
+    /// 获取缓存，如果缓存过期或不存在则更新缓存。
+    async fn get(&self, client: ClientImpl) -> Result<T> {
+        let mut locked = self.last_updated_value.lock().await;
+        let (cache, last_update) = locked.deref_mut();
+        if cache.is_none() || last_update.elapsed() > self.duration {
+            let value = T::fetch(client).await?;
+            *cache = Some(value.clone());
+            *last_update = Instant::now();
+            return Ok(value);
+        }
+        Ok(cache.clone().unwrap())
     }
 }

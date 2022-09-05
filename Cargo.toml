@@ -24,6 +24,7 @@ ricq = "0.1"
 tokio = { version = "1", features = ["rt", "fs"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 futures-util = "0.3"
+async-trait = "0.1"
 anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3" }

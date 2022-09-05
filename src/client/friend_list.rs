@@ -1,8 +1,15 @@
+//! 好友列表。
+//!
+//! 更多信息参考 [`FriendList`]。
+
 use std::collections::HashMap;
 
+use anyhow::Result;
+use async_trait::async_trait;
 use pyo3::{prelude::*, types::*};
+use ricq::structs::{FriendGroupInfo, FriendInfo};
 
-use super::{FriendGroupInfo, FriendInfo};
+use super::{friend::Friend, friend_group::FriendGroup, Cacheable, ClientImpl};
 
 /// 好友列表。
 ///
@@ -15,7 +22,9 @@ use super::{FriendGroupInfo, FriendInfo};
 ///     def online_count(self) -> int: ...
 /// ```
 #[pyclass]
+#[derive(Clone)]
 pub struct FriendList {
+    pub(crate) client: ClientImpl,
     /// 好友信息。
     pub(crate) friends: Vec<FriendInfo>,
     /// 好友分组信息。
@@ -32,7 +41,7 @@ pub struct FriendList {
 impl FriendList {
     /// 遍历好友信息的迭代器。
     ///
-    /// 参考 [`FriendInfo`]。
+    /// 参考 [`Friend`]。
     ///
     /// # Examples
     /// ```python
@@ -43,10 +52,10 @@ impl FriendList {
     ///
     /// # Python
     /// ```python
-    /// def friends(self) -> Iterator[FriendInfo]:
+    /// def friends(self) -> Iterator[Friend]:
     /// ```
-    pub fn friends(self_: Py<Self>, py: Python) -> FriendsIter {
-        FriendsIter {
+    pub fn friends(self_: Py<Self>, py: Python) -> FriendIter {
+        FriendIter {
             list: self_.clone_ref(py),
             curr: 0,
             end: self_.borrow(py).friends.len(),
@@ -55,7 +64,7 @@ impl FriendList {
 
     /// 查找指定的好友。
     ///
-    /// 参考 [`FriendInfo`]。
+    /// 参考 [`Friend`]。
     ///
     /// # Examples
     /// ```python
@@ -69,15 +78,21 @@ impl FriendList {
     ///
     /// # Python
     /// ```python
-    /// def find_friend(self, uin: int) -> FriendInfo | None:
+    /// def find_friend(self, uin: int) -> Friend | None:
     /// ```
-    pub fn find_friend(&self, uin: i64) -> Option<FriendInfo> {
-        self.friends.iter().find(|f| f.uin == uin).cloned()
+    pub fn find_friend(&self, uin: i64) -> Option<Friend> {
+        self.friends
+            .iter()
+            .find(|info| info.uin == uin)
+            .map(|info| Friend {
+                client: self.client.clone(),
+                info: info.clone(),
+            })
     }
 
     /// 获取所有好友分组信息。
     ///
-    /// 参考 [`FriendGroupInfo`]。
+    /// 参考 [`FriendGroup`]。
     ///
     /// # Examples
     /// ```python
@@ -88,20 +103,28 @@ impl FriendList {
     ///
     /// # Python
     /// ```python
-    /// def friend_groups(self) -> list[FriendGroupInfo]:
+    /// def friend_groups(self) -> list[FriendGroup]:
     /// ```
     pub fn friend_groups<'py>(&self, py: Python<'py>) -> PyResult<&'py PyList> {
         let friend_groups = self
             .friend_groups
             .values()
-            .map(|info| PyCell::new(py, info.clone()))
+            .map(|info| {
+                PyCell::new(
+                    py,
+                    FriendGroup {
+                        client: self.client.clone(),
+                        info: info.clone(),
+                    },
+                )
+            })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(PyList::new(py, friend_groups))
     }
 
     /// 查找好友分组。
     ///
-    /// 参考 [`FriendGroupInfo`]。
+    /// 参考 [`FriendGroup`]。
     ///
     /// # Examples
     /// ```python
@@ -112,35 +135,60 @@ impl FriendList {
     ///     if group:
     ///         print("好友 12345678 位于分组", group.name)
     /// ```
-    ///  
+    ///
     /// # Python
     /// ```python
-    /// def find_friend_group(self, group_id: int) -> FriendGroupInfo | None:
+    /// def find_friend_group(self, group_id: int) -> FriendGroup | None:
     /// ```
-    pub fn find_friend_group(&self, group_id: u8) -> Option<FriendGroupInfo> {
-        self.friend_groups.get(&group_id).cloned()
+    pub fn find_friend_group(&self, group_id: u8) -> Option<FriendGroup> {
+        self.friend_groups
+            .get(&group_id)
+            .cloned()
+            .map(|info| FriendGroup {
+                client: self.client.clone(),
+                info,
+            })
+    }
+}
+
+#[async_trait]
+impl Cacheable for FriendList {
+    /// 请求获取好友列表。
+    async fn fetch(client: ClientImpl) -> Result<Self> {
+        let friend_list = client.get_friend_list().await?;
+        let friend_list = FriendList {
+            client,
+            friends: friend_list.friends,
+            friend_groups: friend_list.friend_groups,
+            total_count: friend_list.total_count,
+            online_count: friend_list.online_friend_count,
+        };
+        Ok(friend_list)
     }
 }
 
 #[pyclass]
 #[doc(hidden)]
-pub struct FriendsIter {
+pub struct FriendIter {
     list: Py<FriendList>,
     curr: usize,
     end: usize,
 }
 
 #[pymethods]
-impl FriendsIter {
+impl FriendIter {
     fn __iter__(self_: PyRef<'_, Self>) -> PyRef<'_, Self> {
         self_
     }
 
-    fn __next__(mut self_: PyRefMut<'_, Self>, py: Python) -> Option<FriendInfo> {
-        if self_.curr < self_.end {
-            let info = self_.list.borrow(py).friends[self_.curr].clone();
-            self_.curr += 1;
-            Some(info)
+    fn __next__(&mut self, py: Python) -> Option<Friend> {
+        if self.curr < self.end {
+            let info = self.list.borrow(py).friends[self.curr].clone();
+            self.curr += 1;
+            Some(Friend {
+                client: self.list.borrow(py).client.clone(),
+                info,
+            })
         } else {
             None
         }

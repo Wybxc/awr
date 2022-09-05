@@ -94,27 +94,35 @@ class Client:
 
         多次调用此方法时，后续的调用将直接返回。
         """
+    @property
     def uin(self) -> int:
         """获取客户端 QQ 号。"""
-    def online(self) -> bool:
+    def is_online(self) -> bool:
         """是否在线。"""
-    async def account_info(self) -> AccountInfo:
+    async def get_account_info(self) -> AccountInfo:
         """获取账号信息。"""
     async def get_friend_list(self) -> FriendList:
         """获取好友列表。"""
-    async def get_group_info(self, group_id: int) -> GroupInfo | None:
-        """获取群信息。"""
-    async def get_group_infos(self, group_ids: Sequence[int]) -> dict[int, GroupInfo]:
-        """批量获取群信息，返回 `{ 群号: 群信息 }` 的字典。"""
-    async def get_group_list(self) -> list[GroupInfo]:
+    async def get_friends(self) -> Iterator[Friend]:
+        """获取遍历好友信息的迭代器。"""
+    async def get_friend(self, uin: int) -> Friend | None:
+        """查找指定的好友。"""
+    async def get_group(self, group_id: int) -> Group: 
+        """获取群。"""
+    async def get_groups(self, group_ids: Sequence[int]) -> dict[int, Group]:
+        """批量获取群，返回 `{ 群号: 群对象 }` 的字典。
+
+        当给出的群号不存在，或者未加入这个群时，将不会在返回值中出现。这意味着返回值长度可能会小于参数长度。
+        """
+    async def get_group_list(self) -> list[Group]:
         """获取群列表。
 
         # Note
-        此方法获取到的 `last_msg_seq` 不可用，如需要此字段请使用 `get_group_info`。
+        此方法获取到的 `last_msg_seq` 不可用，如需要此字段请使用 `get_group` 或 `get_groups`。
         """
 
 ################################################################################
-# client/structs.rs
+# client/account_info.rs
 
 class AccountInfo:
     """账号信息。"""
@@ -129,18 +137,21 @@ class AccountInfo:
     def gender(self) -> int:
         """性别。"""
 
-class FriendInfo:
-    """好友信息。"""
+################################################################################
+# client/friend.rs
+
+class Friend:
+    """好友。"""
 
     @property
     def uin(self) -> int:
-        """QQ号。"""
+        """好友 QQ 号。"""
     @property
     def nickname(self) -> str:
-        """昵称。"""
+        """好友昵称。"""
     @property
     def remark(self) -> str:
-        """备注。"""
+        """好友备注。"""
     @property
     def face_id(self) -> int:
         """"""
@@ -148,7 +159,10 @@ class FriendInfo:
     def group_id(self) -> int:
         """好友分组编号。"""
 
-class FriendGroupInfo:
+################################################################################
+# client/friend_group.rs
+
+class FriendGroup:
     """好友分组信息。"""
 
     @property
@@ -167,8 +181,32 @@ class FriendGroupInfo:
     def seq_id(self) -> int:
         """"""
 
-class GroupInfo:
-    """群信息。"""
+################################################################################
+# client/friend_list.rs
+
+class FriendList:
+    """好友列表。"""
+
+    @property
+    def total_count(self) -> int:
+        """好友数量。"""
+    @property
+    def online_count(self) -> int:
+        """在线好友数量。"""
+    def friends(self) -> Iterator[Friend]:
+        """遍历好友信息的迭代器。"""
+    def find_friend(self, uin: int) -> Friend | None:
+        """查找好友。"""
+    def friend_groups(self) -> list[FriendGroup]:
+        """获取所有好友分组信息。"""
+    def find_friend_group(self, group_id: int) -> FriendGroup | None:
+        """查找好友分组。"""
+
+################################################################################
+# client/group.rs
+
+class Group:
+    """群聊。"""
 
     @property
     def uin(self) -> int:
@@ -207,25 +245,7 @@ class GroupInfo:
         """自己被禁言剩余时间。"""
     @property
     def last_msg_seq(self) -> int:
-        """"""
-
-################################################################################
-# client/friend_list.rs
-
-class FriendList:
-    """好友列表。"""
-
-    @property
-    def total_count(self) -> int:
-        """好友数量。"""
-    @property
-    def online_count(self) -> int:
-        """在线好友数量。"""
-    def friends(self) -> Iterator[FriendInfo]:
-        """遍历好友信息的迭代器。"""
-    def find_friend(self, uin: int) -> FriendInfo | None:
-        """查找好友。"""
-    def friend_groups(self) -> list[FriendGroupInfo]:
-        """获取所有好友分组信息。"""
-    def find_friend_group(self, group_id: int) -> FriendGroupInfo | None:
-        """查找好友分组。"""
+        """最后一条消息的 seq。
+        
+        只有通过 `get_group` 或 `get_groups` 获取的群才有此字段。
+        """

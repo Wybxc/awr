@@ -35,6 +35,7 @@ pub mod client;
 mod device;
 pub mod login;
 mod loguru;
+// pub mod selector;
 mod utils;
 
 const LOGO: &str = r#"
@@ -75,9 +76,8 @@ pub fn awr(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<login::Dynamic>()?;
     // 客户端
     m.add_class::<client::Client>()?;
-    m.add_class::<client::AccountInfo>()?;
-    m.add_class::<client::FriendInfo>()?;
-    m.add_class::<client::FriendGroupInfo>()?;
-    m.add_class::<client::FriendList>()?;
+    m.add_class::<client::account_info::AccountInfo>()?;
+    m.add_class::<client::friend_list::FriendList>()?;
+    m.add_class::<client::friend_group::FriendGroup>()?;
     Ok(())
 }
