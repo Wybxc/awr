@@ -1,5 +1,7 @@
 //! 群。
 
+use std::sync::Arc;
+
 use pyo3::prelude::*;
 use ricq::structs::GroupInfo;
 
@@ -9,7 +11,7 @@ use super::ClientImpl;
 #[pyclass]
 pub struct Group {
     #[allow(unused)] // TODO: remove this
-    pub(super) client: ClientImpl,
+    pub(super) client: Arc<ClientImpl>,
     pub(super) info: GroupInfo,
 }
 

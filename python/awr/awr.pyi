@@ -99,6 +99,8 @@ class Client:
         """获取客户端 QQ 号。"""
     def is_online(self) -> bool:
         """是否在线。"""
+    def friend(self, uin) -> FriendSelector:
+        """获取好友选择器。"""
     async def get_account_info(self) -> AccountInfo:
         """获取账号信息。"""
     async def get_friend_list(self) -> FriendList:
@@ -107,7 +109,7 @@ class Client:
         """获取遍历好友信息的迭代器。"""
     async def get_friend(self, uin: int) -> Friend | None:
         """查找指定的好友。"""
-    async def get_group(self, group_id: int) -> Group: 
+    async def get_group(self, group_id: int) -> Group:
         """获取群。"""
     async def get_groups(self, group_ids: Sequence[int]) -> dict[int, Group]:
         """批量获取群，返回 `{ 群号: 群对象 }` 的字典。
@@ -158,6 +160,18 @@ class Friend:
     @property
     def group_id(self) -> int:
         """好友分组编号。"""
+    def as_selector(self) -> FriendSelector:
+        """获取好友选择器。"""
+    async def poke(self) -> None:
+        """戳一戳好友。"""
+
+class FriendSelector:
+    """好友选择器。"""
+
+    async def hydrate(self) -> Friend | None:
+        """获取好友对象。"""
+    async def poke(self) -> None:
+        """戳一戳好友。"""
 
 ################################################################################
 # client/friend_group.rs
@@ -246,6 +260,6 @@ class Group:
     @property
     def last_msg_seq(self) -> int:
         """最后一条消息的 seq。
-        
+
         只有通过 `get_group` 或 `get_groups` 获取的群才有此字段。
         """

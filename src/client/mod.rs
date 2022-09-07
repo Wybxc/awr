@@ -2,11 +2,13 @@
 //!
 //! 更多信息参考 [`Client`]。
 
-use std::{ops::DerefMut, path::PathBuf, sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use pyo3::{prelude::*, types::*};
 use tokio::task::JoinHandle;
+
+mod client_impl;
 
 pub mod account_info;
 pub mod friend;
@@ -20,9 +22,10 @@ use crate::{
     utils::{py_future, py_none, py_obj},
 };
 
-use self::{account_info::AccountInfo, friend_list::FriendList, group::Group};
-
-pub(crate) type ClientImpl = Arc<ricq::Client>;
+use self::{
+    account_info::AccountInfo, client_impl::ClientImpl, friend::FriendSelector,
+    friend_list::FriendList, group::Group,
+};
 
 /// QQ 无头客户端。
 ///
@@ -43,26 +46,25 @@ pub(crate) type ClientImpl = Arc<ricq::Client>;
 /// ```
 #[pyclass]
 pub struct Client {
-    client: ClientImpl,
+    client: Arc<ClientImpl>,
     alive: Option<JoinHandle<()>>,
     uin: i64,
     data_folder: PathBuf,
-    friend_list: Arc<Cached<FriendList>>,
 }
 
 impl Client {
     pub(crate) async fn new(
-        client: ClientImpl,
+        client: Arc<ricq::Client>,
         alive: JoinHandle<()>,
         data_folder: PathBuf,
     ) -> Self {
         let uin = client.uin().await;
+        let client = Arc::new(ClientImpl::new(client));
         Self {
             client,
             alive: Some(alive),
             uin,
             data_folder,
-            friend_list: Cached::new(Duration::from_secs(3600)),
         }
     }
 }
@@ -85,7 +87,7 @@ impl Client {
     /// async def alive(self) -> None: ...
     /// ```
     pub fn alive<'py>(&mut self, py: Python<'py>) -> PyResult<&'py PyAny> {
-        let client = self.client.clone();
+        let client = self.client.inner().clone();
         let data_folder = self.data_folder.clone();
         let alive = self.alive.take();
         py_future(py, async move {
@@ -132,8 +134,29 @@ impl Client {
     /// ```
     pub fn is_online(&self) -> bool {
         self.client
+            .inner()
             .online
             .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// 构造好友选择器。
+    ///
+    /// 参考 [`FriendSelector`]。
+    ///
+    /// # Examples
+    /// ```python
+    /// await client.friend(12345678).poke()
+    /// ```
+    ///
+    /// # Python
+    /// ```python
+    /// def friend(self, uin: int) -> FriendSelector: ...
+    /// ```    
+    pub fn friend(&self, uin: i64) -> FriendSelector {
+        FriendSelector {
+            client: self.client.clone(),
+            uin,
+        }
     }
 
     /// 获取账号信息。
@@ -153,7 +176,7 @@ impl Client {
     /// async def get_account_info(self) -> AccountInfo: ...
     /// ```
     pub fn get_account_info<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
-        let client = self.client.clone();
+        let client = self.client.inner().clone();
         py_future(py, async move {
             let info = client.account_info.read().await;
             let info = AccountInfo {
@@ -182,9 +205,8 @@ impl Client {
     /// ```
     pub fn get_friend_list<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
-        let friend_list = self.friend_list.clone();
         py_future(py, async move {
-            let friend_list = { friend_list.get(client).await? };
+            let friend_list = client.get_friend_list_cached().await?;
             Ok(py_obj(friend_list)?)
         })
     }
@@ -207,9 +229,8 @@ impl Client {
     /// [`Friend`]: friend::Friend
     pub fn get_friends<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
-        let friend_list = self.friend_list.clone();
         py_future(py, async move {
-            let friend_list = { friend_list.get(client).await? };
+            let friend_list = client.get_friend_list_cached().await?;
             let friends = Python::with_gil(|py| -> PyResult<PyObject> {
                 Ok(FriendList::friends(Py::new(py, friend_list)?, py).into_py(py))
             })?;
@@ -238,9 +259,8 @@ impl Client {
     /// [`Friend`]: friend::Friend
     pub fn get_friend<'py>(&self, py: Python<'py>, uin: i64) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
-        let friend_list = self.friend_list.clone();
         py_future(py, async move {
-            let friend_list = { friend_list.get(client).await? };
+            let friend_list = client.get_friend_list_cached().await?;
             let friend = friend_list.find_friend(uin);
             Ok(match friend {
                 Some(friend) => Some(py_obj(friend)?),
@@ -266,7 +286,7 @@ impl Client {
     pub fn get_group<'py>(&self, py: Python<'py>, group_id: i64) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
         py_future(py, async move {
-            if let Some(info) = client.get_group_info(group_id).await? {
+            if let Some(info) = client.inner().get_group_info(group_id).await? {
                 let group = Group { client, info };
                 Ok(Some(py_obj(group)?))
             } else {
@@ -297,21 +317,16 @@ impl Client {
     pub fn get_groups<'py>(&self, py: Python<'py>, group_ids: Vec<i64>) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
         py_future(py, async move {
-            let infos = client.get_group_infos(group_ids).await?;
+            let infos = client.inner().get_group_infos(group_ids).await?;
             let infos = infos.into_iter().map(|info| (info.code, info));
             Ok(Python::with_gil(|py| -> PyResult<PyObject> {
                 let dict = PyDict::new(py);
                 for (key, info) in infos {
-                    dict.set_item(
-                        key,
-                        PyCell::new(
-                            py,
-                            Group {
-                                client: client.clone(),
-                                info,
-                            },
-                        )?,
-                    )?;
+                    let group = Group {
+                        client: client.clone(),
+                        info,
+                    };
+                    dict.set_item(key, PyCell::new(py, group)?)?;
                 }
                 Ok(dict.into_py(py))
             })?)
@@ -342,7 +357,7 @@ impl Client {
     pub fn get_group_list<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         let client = self.client.clone();
         py_future(py, async move {
-            let group_list = client.get_group_list().await?;
+            let group_list = client.inner().get_group_list().await?;
             let group_list = group_list.into_iter().map(|info| Group {
                 client: client.clone(),
                 info,
@@ -357,47 +372,5 @@ impl Client {
                 Ok(list.into_py(py))
             })?)
         })
-    }
-}
-
-use async_trait::async_trait;
-use tokio::{sync::Mutex, time::Instant};
-
-/// 缓存。
-struct Cached<T: Cacheable> {
-    last_updated_value: Mutex<(Option<T>, Instant)>,
-    duration: Duration,
-}
-
-/// 可缓存的值。
-#[async_trait]
-pub(crate) trait Cacheable: Clone {
-    /// 从远程获取值。
-    async fn fetch(client: ClientImpl) -> Result<Self>;
-}
-
-impl<T: Cacheable> Cached<T> {
-    /// 创建一个新的缓存。
-    ///
-    /// # Arguments
-    /// * `duration` - 缓存时长。
-    fn new(duration: Duration) -> Arc<Self> {
-        Arc::new(Self {
-            last_updated_value: Mutex::new((None, Instant::now())),
-            duration,
-        })
-    }
-
-    /// 获取缓存，如果缓存过期或不存在则更新缓存。
-    async fn get(&self, client: ClientImpl) -> Result<T> {
-        let mut locked = self.last_updated_value.lock().await;
-        let (cache, last_update) = locked.deref_mut();
-        if cache.is_none() || last_update.elapsed() > self.duration {
-            let value = T::fetch(client).await?;
-            *cache = Some(value.clone());
-            *last_update = Instant::now();
-            return Ok(value);
-        }
-        Ok(cache.clone().unwrap())
     }
 }

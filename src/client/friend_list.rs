@@ -2,14 +2,18 @@
 //!
 //! 更多信息参考 [`FriendList`]。
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use async_trait::async_trait;
 use pyo3::{prelude::*, types::*};
 use ricq::structs::{FriendGroupInfo, FriendInfo};
 
-use super::{friend::Friend, friend_group::FriendGroup, Cacheable, ClientImpl};
+use super::{
+    client_impl::{Cacheable, ClientImpl},
+    friend::Friend,
+    friend_group::FriendGroup,
+};
 
 /// 好友列表。
 ///
@@ -24,7 +28,7 @@ use super::{friend::Friend, friend_group::FriendGroup, Cacheable, ClientImpl};
 #[pyclass]
 #[derive(Clone)]
 pub struct FriendList {
-    pub(crate) client: ClientImpl,
+    pub(crate) client: Arc<ClientImpl>,
     /// 好友信息。
     pub(crate) friends: Vec<FriendInfo>,
     /// 好友分组信息。
@@ -154,16 +158,8 @@ impl FriendList {
 #[async_trait]
 impl Cacheable for FriendList {
     /// 请求获取好友列表。
-    async fn fetch(client: ClientImpl) -> Result<Self> {
-        let friend_list = client.get_friend_list().await?;
-        let friend_list = FriendList {
-            client,
-            friends: friend_list.friends,
-            friend_groups: friend_list.friend_groups,
-            total_count: friend_list.total_count,
-            online_count: friend_list.online_friend_count,
-        };
-        Ok(friend_list)
+    async fn fetch(client: Arc<ClientImpl>) -> Result<Self> {
+        client.get_friend_list().await
     }
 }
 

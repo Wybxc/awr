@@ -2,6 +2,8 @@
 //!
 //! 更多信息参考 [`FriendGroup`]。
 
+use std::sync::Arc;
+
 use pyo3::prelude::*;
 use ricq::structs::FriendGroupInfo;
 
@@ -17,7 +19,7 @@ use super::ClientImpl;
 #[derive(Clone)]
 pub struct FriendGroup {
     #[allow(unused)] // TODO: remove this
-    pub(super) client: ClientImpl,
+    pub(super) client: Arc<ClientImpl>,
     pub(super) info: FriendGroupInfo,
 }
 
