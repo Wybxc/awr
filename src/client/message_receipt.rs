@@ -9,24 +9,27 @@ use super::{client_impl::ClientImpl, friend::FriendSelector};
 
 pub(crate) enum MesageReceiptContext {
     #[allow(unused)] // TODO: remove this
-    Group { group_id: i64, target_id: i64 },
+    Group {
+        group_id: i64,
+        target_id: i64,
+    },
     Friend(FriendSelector),
 }
 
 /// 消息回执，可以用于撤回消息。
-/// 
+///
 /// # Examples
 /// ```python
 /// receipt = await client.friend(123456789).send(['hello'])
 /// await receipt.recall()
 /// ```
-/// 
+///
 /// # Python
 /// ```python
 /// class MessageReceipt: ...
 /// ```
 #[pyclass]
-pub struct MessageReceipt {    
+pub struct MessageReceipt {
     pub(crate) context: MesageReceiptContext,
     pub(crate) receipt: Receipt,
 }
@@ -58,7 +61,7 @@ impl MessageReceipt {
     }
 
     /// 撤回消息。
-    /// 
+    ///
     /// # Python
     /// ```python
     /// async def recall(self) -> None: ...

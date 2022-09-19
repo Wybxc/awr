@@ -129,7 +129,7 @@ impl Friend {
     /// ```python
     /// await client.friend(123456789).send(["Hello, world!"])
     /// ```
-    /// 
+    ///
     /// # Python
     /// ```python
     /// async def send(self, msg: Sequence[Element]) -> MessageReceipt: ...
@@ -217,7 +217,7 @@ impl FriendSelector {
     /// ```python
     /// await client.friend(123456789).send(["Hello, world!"])
     /// ```
-    /// 
+    ///
     /// # Python
     /// ```python
     /// async def send(self, msg: Sequence[Element]) -> MessageReceipt: ...
