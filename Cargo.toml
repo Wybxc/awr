@@ -18,11 +18,16 @@ name = "awr"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.16", features = ["extension-module", "anyhow"] }
-pyo3-asyncio = { version = "0.16", features = ["tokio-runtime"] }
-ricq = "0.1"
+pyo3 = { version = "0.17", features = ["extension-module", "anyhow"] }
+# pyo3-asyncio = { version = "0.16", features = ["tokio-runtime"] }
+pyo3-asyncio = { git = "https://github.com/tristan/pyo3-asyncio.git", branch = "update-pyo3-to-0-17-1", features = [
+    "tokio-runtime",
+] }
+ricq = "0.1.17"
+ricq-core = "0.1"
 tokio = { version = "1", features = ["rt", "fs"] }
 tokio-util = { version = "0.7", features = ["codec"] }
+tokio-stream = "0.1"
 futures-util = "0.3"
 async-trait = "0.1"
 anyhow = "1.0"

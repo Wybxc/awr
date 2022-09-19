@@ -15,6 +15,7 @@ pub mod friend;
 pub mod friend_group;
 pub mod friend_list;
 pub mod group;
+pub mod message_receipt;
 
 use crate::{
     login::reconnect,

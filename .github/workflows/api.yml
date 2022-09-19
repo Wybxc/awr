@@ -30,6 +30,7 @@ jobs:
   deploy:
     name: Develop Deploy
     runs-on: ubuntu-latest
+    if: "startsWith(github.ref, 'refs/heads/')"
     needs: [ build ]
     steps:
     - uses: actions/setup-node@v3

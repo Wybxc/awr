@@ -4,12 +4,15 @@
 
 use std::sync::Arc;
 
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PySequence};
 use ricq::structs::FriendInfo;
 
-use crate::utils::{py_future, py_none, py_obj};
+use crate::{
+    message::{chain::build_message_chain, elements::Element},
+    utils::{py_future, py_none, py_obj},
+};
 
-use super::ClientImpl;
+use super::{message_receipt::MessageReceipt, ClientImpl};
 
 /// 好友。
 ///
@@ -119,6 +122,35 @@ impl Friend {
     pub fn poke<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
         self.as_selector().poke(py)
     }
+
+    /// 发送私聊消息。
+    ///
+    /// # Examples
+    /// ```python
+    /// await client.friend(123456789).send(["Hello, world!"])
+    /// ```
+    /// 
+    /// # Python
+    /// ```python
+    /// async def send(self, msg: Sequence[Element]) -> MessageReceipt: ...
+    /// ```
+    pub fn send<'py>(&self, py: Python<'py>, msg: &'py PySequence) -> PyResult<&'py PyAny> {
+        self.as_selector().send(py, msg)
+    }
+
+    /// 撤回消息。
+    ///
+    /// # Python
+    /// ```python
+    /// async def recall(self, receipt: MessageReceipt) -> None: ...
+    /// ```
+    pub fn recall<'py>(
+        &self,
+        py: Python<'py>,
+        receipt: PyRef<'py, MessageReceipt>,
+    ) -> PyResult<&'py PyAny> {
+        self.as_selector().recall(py, receipt)
+    }
 }
 
 /// 好友选择器。
@@ -175,6 +207,56 @@ impl FriendSelector {
         let uin = self.uin;
         py_future(py, async move {
             client.friend_poke(uin).await?;
+            Ok(py_none())
+        })
+    }
+
+    /// 发送私聊消息。
+    ///
+    /// # Examples
+    /// ```python
+    /// await client.friend(123456789).send(["Hello, world!"])
+    /// ```
+    /// 
+    /// # Python
+    /// ```python
+    /// async def send(self, msg: Sequence[Element]) -> MessageReceipt: ...
+    /// ```
+    pub fn send<'py>(&self, py: Python<'py>, msg: &'py PySequence) -> PyResult<&'py PyAny> {
+        let client_impl = self.client.clone();
+        let client = self.client.inner().clone();
+        let uin = self.uin;
+        let elements: Vec<Element> = msg
+            .iter()?
+            .map(|elem| elem?.extract())
+            .collect::<PyResult<_>>()?;
+        py_future(py, async move {
+            let chain = build_message_chain(elements).await;
+            let receipt = client.send_friend_message(uin, chain).await?;
+            Ok(MessageReceipt::new_from_friend(client_impl, uin, receipt))
+        })
+    }
+
+    /// 撤回消息。
+    ///
+    /// # Python
+    /// ```python
+    /// async def recall(self, receipt: MessageReceipt) -> None: ...
+    /// ```
+    pub fn recall<'py>(
+        &self,
+        py: Python<'py>,
+        receipt: PyRef<'py, MessageReceipt>,
+    ) -> PyResult<&'py PyAny> {
+        let client = self.client.inner().clone();
+        let uin = self.uin;
+        let msg_time = receipt.msg_time();
+        let seqs = receipt.seqs();
+        let rands = receipt.rands();
+        py_future(py, async move {
+            client
+                .recall_friend_message(uin, msg_time, seqs, rands)
+                .await?;
             Ok(py_none())
         })
     }

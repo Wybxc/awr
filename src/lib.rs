@@ -25,7 +25,7 @@
 //! [`ricq`]: https://docs.rs/ricq/latest/ricq/
 
 #![deny(missing_docs)]
-#![allow(clippy::borrow_deref_ref)] // TODO: Remove this line when pyo3-asyncio is updated to 0.17
+// #![allow(clippy::borrow_deref_ref)] // TODO: Remove this line when pyo3-asyncio is updated to 0.17
 
 use pyo3::prelude::*;
 
@@ -35,6 +35,7 @@ pub mod client;
 mod device;
 pub mod login;
 mod loguru;
+pub mod message;
 // pub mod selector;
 mod utils;
 

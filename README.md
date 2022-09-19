@@ -1,4 +1,4 @@
-<center>
+<div align="center">
 
 # AWR
 
@@ -10,7 +10,7 @@
 [![Docs Status](https://img.shields.io/github/workflow/status/Wybxc/awr/API%20Document?label=docs)](https://awr-latest.netlify.app)
 [![GitHub](https://img.shields.io/github/last-commit/Wybxc/awr?label=GitHub)](https://github.com/Wybxc/awr)
 
-</center>
+</div>
 
 基于 [`ricq`](https://github.com/lz1998/ricq) 包装，供 Python 使用的 QQ 无头客户端。
 

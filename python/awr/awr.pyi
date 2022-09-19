@@ -1,4 +1,4 @@
-from typing import Any, Iterator, Literal, Sequence
+from typing import Any, Iterator, Literal, Sequence, TypedDict
 
 ################################################################################
 # lib.rs
@@ -164,6 +164,8 @@ class Friend:
         """获取好友选择器。"""
     async def poke(self) -> None:
         """戳一戳好友。"""
+    async def send(self, msg: Sequence[Element]) -> MessageReceipt:
+        """发送私聊消息。"""
 
 class FriendSelector:
     """好友选择器。"""
@@ -172,6 +174,10 @@ class FriendSelector:
         """获取好友对象。"""
     async def poke(self) -> None:
         """戳一戳好友。"""
+    async def send(self, msg: Sequence[Element]) -> MessageReceipt:
+        """发送私聊消息。"""
+    async def recall(self, receipt: MessageReceipt) -> None:
+        """撤回消息。"""
 
 ################################################################################
 # client/friend_group.rs
@@ -263,3 +269,26 @@ class Group:
 
         只有通过 `get_group` 或 `get_groups` 获取的群才有此字段。
         """
+
+################################################################################
+# client/message_receipt.rs
+
+class MessageReceipt:
+    def msg_time(self) -> int: ...
+    def seqs(self) -> list[int]: ...
+    def rands(self) -> list[int]: ...
+    async def recall(self) -> None:
+        """撤回消息。"""
+
+################################################################################
+# message/elements.rs
+
+class Text(TypedDict):
+    type: Literal["text"]
+    text: str
+
+class At(TypedDict):
+    type: Literal["at"]
+    target: int
+
+Element = str | Text | At

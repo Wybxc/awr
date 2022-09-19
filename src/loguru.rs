@@ -87,7 +87,9 @@ where
             s => s,
         };
         Python::with_gil(|py| {
-            let args = (level.into_py(py), message.into_py(py));
+            let level: Py<PyString> = level.into_py(py);
+            let message: Py<PyAny> = message.into_py(py);
+            let args = (level, message);
             self.log_fn.call(py, args, None).unwrap();
         });
     }
@@ -152,7 +154,10 @@ pub struct FakePyCode {
 
 impl FakePyFrame {
     fn new(name: &str, file_path: &str, function: &str, line: u32) -> Result<FakePyFrame> {
-        let f_globals = Python::with_gil(|py| py_dict!(py, "__name__" => name.into_py(py)).into());
+        let f_globals = Python::with_gil(|py| {
+            let name: Py<PyString> = name.into_py(py);
+            py_dict!(py, "__name__" => name).into()
+        });
         let f_code = Python::with_gil(|py| {
             Py::new(
                 py,
