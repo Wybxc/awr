@@ -4,6 +4,7 @@ pre_bump_hooks = [
     "cargo set-version {{version}}",
 ]
 post_bump_hooks = []
+ignore_merge_commits = true
 
 [commit_types]
 
