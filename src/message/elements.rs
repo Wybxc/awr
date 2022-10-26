@@ -3,31 +3,29 @@
 use pyo3::{exceptions::PyTypeError, prelude::*, types::*};
 use ricq_core::msg::elem;
 
-macro_rules! type_check {
-    ($($checker:ident, $value:expr),*$(,)?) => {
-        $(fn $checker(obj: &PyAny) -> PyResult<()> {
-            let elem_type: String = obj.get_item("type")?.extract()?;
-            let elem_type = elem_type.to_lowercase();
-            if elem_type != $value {
-                return Err(PyTypeError::new_err(format!(
-                    "expected type '{}', got '{}'",
-                    $value, elem_type
-                )));
-            }
-            Ok(())
-        })*
-    };
-}
-
-type_check! {
-    check_text, "text",
-    check_at, "at",
-}
-
-#[derive(FromPyObject)]
 pub(crate) enum Element {
     Text(Text),
     At(At),
+    Face(Face),
+}
+
+impl FromPyObject<'_> for Element {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        if obj.is_instance_of::<PyString>()? {
+            let text = obj.extract()?;
+            return Ok(Self::Text(Text { text }));
+        }
+        let elem_type: String = obj.get_item("type")?.extract()?;
+        let elem_type = elem_type.to_lowercase();
+        match elem_type.as_str() {
+            "text" => Ok(Element::Text(obj.extract()?)),
+            "at" => Ok(Element::At(obj.extract()?)),
+            "face" => Ok(Element::Face(obj.extract()?)),
+            _ => Err(PyTypeError::new_err(format!(
+                "unknown message element type '{elem_type}'"
+            ))),
+        }
+    }
 }
 
 /// 文本。
@@ -49,11 +47,13 @@ impl FromPyObject<'_> for Text {
             return Ok(Self { text });
         }
         if obj.is_instance_of::<PyDict>()? {
-            check_text(obj)?;
             let text = obj.get_item("text")?.extract()?;
             return Ok(Self { text });
         }
-        Err(PyTypeError::new_err("Text"))
+        let repr = obj.repr()?.to_str()?;
+        Err(PyTypeError::new_err(format!(
+            "expected str or Text, got {repr}"
+        )))
     }
 }
 
@@ -71,16 +71,53 @@ impl Text {
 ///     type: Literal["at"]
 ///     target: int
 /// ```
-#[derive(FromPyObject)]
 pub struct At {
-    #[pyo3(from_py_with = "check_at")]
-    _type: (),
-    #[pyo3(item)]
     target: i64,
+}
+
+impl FromPyObject<'_> for At {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let target = obj.get_item("target")?.extract()?;
+        Ok(Self { target })
+    }
 }
 
 impl At {
     pub(crate) fn into_elem(self) -> elem::At {
         elem::At::new(self.target)
+    }
+}
+
+/// Face。
+///
+/// # Python
+/// ```python
+/// class Face(TypedDict):
+///     type: Literal["face"]
+///     id: int | None
+///     name: str | None
+/// ```
+pub struct Face {
+    id: Option<i32>,
+    name: Option<String>,
+}
+
+impl FromPyObject<'_> for Face {
+    fn extract(obj: &PyAny) -> PyResult<Self> {
+        let id = obj.get_item("id")?.extract()?;
+        let name = obj.get_item("name")?.extract()?;
+        Ok(Self { id, name })
+    }
+}
+
+impl Face {
+    pub(crate) fn into_elem(self) -> Option<elem::Face> {
+        if let Some(id) = self.id {
+            Some(elem::Face::new(id))
+        } else if let Some(name) = self.name {
+            elem::Face::new_from_name(&name)
+        } else {
+            None
+        }
     }
 }

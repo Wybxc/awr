@@ -8,7 +8,7 @@ use pyo3::{prelude::*, types::PySequence};
 use ricq::structs::FriendInfo;
 
 use crate::{
-    message::{chain::build_message_chain, elements::Element},
+    message::{chain::build_friend_message_chain, elements::Element},
     utils::{py_future, py_none, py_obj},
 };
 
@@ -231,7 +231,7 @@ impl FriendSelector {
             .map(|elem| elem?.extract())
             .collect::<PyResult<_>>()?;
         py_future(py, async move {
-            let chain = build_message_chain(elements).await;
+            let chain = build_friend_message_chain(elements).await?;
             let receipt = client.send_friend_message(uin, chain).await?;
             Ok(MessageReceipt::new_from_friend(client_impl, uin, receipt))
         })

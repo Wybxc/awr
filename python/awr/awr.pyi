@@ -1,4 +1,4 @@
-from typing import Any, Iterator, Literal, Sequence, TypedDict
+from typing import Any, Iterator, Literal, Sequence
 
 ################################################################################
 # lib.rs
@@ -283,12 +283,4 @@ class MessageReceipt:
 ################################################################################
 # message/elements.rs
 
-class Text(TypedDict):
-    type: Literal["text"]
-    text: str
-
-class At(TypedDict):
-    type: Literal["at"]
-    target: int
-
-Element = str | Text | At
+from .message import Element

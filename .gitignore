@@ -1,6 +1,6 @@
 /target
 /bots
-/test.py
+/test.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
