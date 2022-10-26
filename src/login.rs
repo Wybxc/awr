@@ -285,7 +285,7 @@ impl Dynamic {
             // 询问登录方式
             let login_method = {
                 let login_method = Question::select("login_method")
-                    .message(format!("请选择账号 {} 的登录方式：", uin))
+                    .message(format!("请选择账号 {uin} 的登录方式："))
                     .choice("密码登录")
                     .choice("二维码登录")
                     .build();

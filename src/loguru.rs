@@ -110,7 +110,7 @@ impl tracing::field::Visit for LoguruVisiter {
         if field.name() == "message" {
             self.0.push_str(value);
         } else {
-            write!(self.0, "{}={}", field.name(), value).unwrap();
+            write!(self.0, "{}={value}", field.name()).unwrap();
         }
     }
 
@@ -119,14 +119,14 @@ impl tracing::field::Visit for LoguruVisiter {
         field: &tracing::field::Field,
         value: &(dyn std::error::Error + 'static),
     ) {
-        write!(self.0, "{}={}", field.name(), value).unwrap();
+        write!(self.0, "{}={value}", field.name()).unwrap();
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
         if field.name() == "message" {
-            write!(self.0, "{:?}", value).unwrap();
+            write!(self.0, "{value:?}").unwrap();
         } else {
-            write!(self.0, "{}={:?}", field.name(), value).unwrap();
+            write!(self.0, "{}={value:?}", field.name()).unwrap();
         }
     }
 }
