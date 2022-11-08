@@ -1,14 +1,15 @@
 <div align="center">
 
-# AWR
+![awr](https://socialify.git.ci/wybxc/awr/image?description=1&font=Bitter&language=1&name=1&theme=Dark) 
+   
+![GitHub Stars](https://img.shields.io/github/stars/wybxc/awr?style=for-the-badge)
+[![GitHub Issues](https://img.shields.io/github/issues/Wybxc/awr?style=for-the-badge)](https://github.com/Wybxc/awr/issues)
+[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Wybxc/awr?style=for-the-badge)](https://github.com/Wybxc/awr/pulls)
 
-![Build Status](https://img.shields.io/github/workflow/status/Wybxc/awr/CI)
-[![GitHub Issues](https://img.shields.io/github/issues/Wybxc/awr)](https://github.com/Wybxc/awr/issues)
-[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Wybxc/awr)](https://github.com/Wybxc/awr/pulls)
-
-![LICENCE](https://img.shields.io/github/license/Wybxc/awr)
-[![Docs Status](https://img.shields.io/github/workflow/status/Wybxc/awr/API%20Document?label=docs)](https://awr-latest.netlify.app)
-[![GitHub](https://img.shields.io/github/last-commit/Wybxc/awr?label=GitHub)](https://github.com/Wybxc/awr)
+![Build Status](https://img.shields.io/github/workflow/status/Wybxc/awr/CI?style=for-the-badge)
+![LICENCE](https://img.shields.io/github/license/Wybxc/awr?style=for-the-badge)
+[![Docs Status](https://img.shields.io/github/workflow/status/Wybxc/awr/API%20Document?label=docs&style=for-the-badge)](https://awr-latest.netlify.app)
+[![GitHub](https://img.shields.io/github/last-commit/Wybxc/awr?label=GitHub&style=for-the-badge)](https://github.com/Wybxc/awr)
 
 </div>
 
