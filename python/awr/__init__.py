@@ -3,16 +3,15 @@ from . import awr as _awr
 _awr.init(_awr)
 __version__ = _awr.__version__
 
-from .awr import Client, Dynamic, Password
-from .message import At, Face, Text
+from .awr import At, Client, Dynamic, Face, MessageContent, Password
 
 __all__ = [
     "Client",
     "Password",
     "Dynamic",
-    "Text",
     "At",
     "Face",
+    "MessageContent",
 ]
 
 # 检查 avilla 是否启用

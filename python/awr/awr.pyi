@@ -1,4 +1,4 @@
-from typing import Any, Iterator, Literal, Sequence
+from typing import Any, Iterator, Literal, Sequence, overload
 
 ################################################################################
 # lib.rs
@@ -164,7 +164,11 @@ class Friend:
         """获取好友选择器。"""
     async def poke(self) -> None:
         """戳一戳好友。"""
-    async def send(self, msg: Sequence[Element]) -> MessageReceipt:
+    @overload
+    async def send(self, *segments: str | Element) -> MessageReceipt:
+        """发送私聊消息。"""
+    @overload
+    async def send(self, content: MessageContent, /) -> MessageReceipt:
         """发送私聊消息。"""
 
 class FriendSelector:
@@ -174,7 +178,11 @@ class FriendSelector:
         """获取好友对象。"""
     async def poke(self) -> None:
         """戳一戳好友。"""
-    async def send(self, msg: Sequence[Element]) -> MessageReceipt:
+    @overload
+    async def send(self, *segments: str | Element) -> MessageReceipt:
+        """发送私聊消息。"""
+    @overload
+    async def send(self, content: MessageContent, /) -> MessageReceipt:
         """发送私聊消息。"""
     async def recall(self, receipt: MessageReceipt) -> None:
         """撤回消息。"""
@@ -283,4 +291,37 @@ class MessageReceipt:
 ################################################################################
 # message/elements.rs
 
-from .message import Element
+class At:
+    """At。"""
+
+    @property
+    def target(self) -> int:
+        """被 At 的 QQ 号。"""
+
+class Face:
+    """表情。"""
+
+    @overload
+    def __init__(self, id: int, /) -> None: ...
+    @overload
+    def __init__(self, name: str, /) -> None: ...
+    @overload
+    def __init__(self, *, id: int | None = None, name: str | None = None) -> None: ...
+    @property
+    def id(self) -> int:
+        """表情 id。"""
+    @property
+    def name(self) -> str:
+        """表情名称。"""
+
+Element = At | Face
+
+################################################################################
+# message/content.rs
+
+class MessageContent:
+    """消息内容。"""
+
+    @staticmethod
+    async def build_friend_message(*segments: str | Element) -> MessageContent:
+        """构造好友消息链。"""

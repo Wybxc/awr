@@ -77,5 +77,10 @@ pub fn awr(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<login::Dynamic>()?;
     // 客户端
     m.add_class::<client::Client>()?;
+    // 消息元素
+    m.add_class::<message::elements::At>()?;
+    m.add_class::<message::elements::Face>()?;
+    // 消息内容
+    m.add_class::<message::content::MessageContent>()?;
     Ok(())
 }

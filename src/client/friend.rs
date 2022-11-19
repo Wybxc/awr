@@ -4,15 +4,15 @@
 
 use std::sync::Arc;
 
-use pyo3::{prelude::*, types::PySequence};
+use either::{Either, Left, Right};
+use pyo3::{prelude::*, types::PyTuple};
 use ricq::structs::FriendInfo;
 
+use super::{message_receipt::MessageReceipt, ClientImpl};
 use crate::{
-    message::{chain::build_friend_message_chain, elements::Element},
+    message::{content::MessageContent, elements::ElementOrText},
     utils::{py_future, py_none, py_obj},
 };
-
-use super::{message_receipt::MessageReceipt, ClientImpl};
 
 /// 好友。
 ///
@@ -132,10 +132,14 @@ impl Friend {
     ///
     /// # Python
     /// ```python
-    /// async def send(self, msg: Sequence[Element]) -> MessageReceipt: ...
+    /// @overload
+    /// async def send(self, *segments: str | Element) -> MessageReceipt: ...
+    /// @overload
+    /// async def send(self, content: MessageContent, /) -> MessageReceipt: ...
     /// ```
-    pub fn send<'py>(&self, py: Python<'py>, msg: &'py PySequence) -> PyResult<&'py PyAny> {
-        self.as_selector().send(py, msg)
+    #[args(segments = "*")]
+    pub fn send<'py>(&self, py: Python<'py>, segments: &'py PyTuple) -> PyResult<&'py PyAny> {
+        self.as_selector().send(py, segments)
     }
 
     /// 撤回消息。
@@ -220,19 +224,29 @@ impl FriendSelector {
     ///
     /// # Python
     /// ```python
-    /// async def send(self, msg: Sequence[Element]) -> MessageReceipt: ...
+    /// @overload
+    /// async def send(self, *segments: str | Element) -> MessageReceipt: ...
+    /// @overload
+    /// async def send(self, content: MessageContent, /) -> MessageReceipt: ...
     /// ```
-    pub fn send<'py>(&self, py: Python<'py>, msg: &'py PySequence) -> PyResult<&'py PyAny> {
+    #[args(segments = "*")]
+    pub fn send<'py>(&self, py: Python<'py>, segments: &'py PyTuple) -> PyResult<&'py PyAny> {
         let client_impl = self.client.clone();
         let client = self.client.inner().clone();
         let uin = self.uin;
-        let elements: Vec<Element> = msg
-            .iter()?
-            .map(|elem| elem?.extract())
-            .collect::<PyResult<_>>()?;
+        let content: Either<MessageContent, Vec<ElementOrText>> =
+            if segments.len() == 1 && segments.get_item(0)?.is_instance_of::<MessageContent>()? {
+                Left(segments.get_item(0)?.extract::<MessageContent>()?)
+            } else {
+                let segments = segments.extract()?;
+                Right(segments)
+            };
         py_future(py, async move {
-            let chain = build_friend_message_chain(elements).await?;
-            let receipt = client.send_friend_message(uin, chain).await?;
+            let content = match content {
+                Left(content) => content,
+                Right(segments) => MessageContent::build_friend_message_impl(segments).await?,
+            };
+            let receipt = client.send_friend_message(uin, content.into()).await?;
             Ok(MessageReceipt::new_from_friend(client_impl, uin, receipt))
         })
     }

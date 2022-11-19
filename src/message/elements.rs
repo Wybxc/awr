@@ -1,65 +1,58 @@
 //! 消息元素。
 
 use pyo3::{exceptions::PyTypeError, prelude::*, types::*};
+use ricq::msg::PushElem;
 use ricq_core::msg::elem;
 
-pub(crate) enum Element {
-    Text(Text),
-    At(At),
-    Face(Face),
-}
-
-impl FromPyObject<'_> for Element {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
-        if obj.is_instance_of::<PyString>()? {
-            let text = obj.extract()?;
-            return Ok(Self::Text(Text { text }));
-        }
-        let elem_type: String = obj.get_item("type")?.extract()?;
-        let elem_type = elem_type.to_lowercase();
-        match elem_type.as_str() {
-            "text" => Ok(Element::Text(obj.extract()?)),
-            "at" => Ok(Element::At(obj.extract()?)),
-            "face" => Ok(Element::Face(obj.extract()?)),
-            _ => Err(PyTypeError::new_err(format!(
-                "unknown message element type '{elem_type}'"
-            ))),
-        }
-    }
-}
-
-/// 文本。
+/// 消息元素。
 ///
 /// # Python
 /// ```python
-/// class Text(TypedDict):
-///     type: Literal["text"]
-///     text: str
+/// Element = At | Face
 /// ```
-pub struct Text {
-    text: String,
+#[derive(FromPyObject)]
+#[non_exhaustive]
+pub enum Element {
+    #[doc(hidden)]
+    At(At),
+    #[doc(hidden)]
+    Face(Face),
 }
 
-impl FromPyObject<'_> for Text {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
-        if obj.is_instance_of::<PyString>()? {
-            let text = obj.extract()?;
-            return Ok(Self { text });
+impl PushElem for Element {
+    fn push_to(elem: Self, vec: &mut Vec<ricq::msg::MessageElem>) {
+        match elem {
+            Element::At(at) => PushElem::push_to(elem::At::from(at), vec),
+            Element::Face(face) => PushElem::push_to(elem::Face::from(face), vec),
         }
-        if obj.is_instance_of::<PyDict>()? {
-            let text = obj.get_item("text")?.extract()?;
-            return Ok(Self { text });
-        }
-        let repr = obj.repr()?.to_str()?;
-        Err(PyTypeError::new_err(format!(
-            "expected str or Text, got {repr}"
-        )))
     }
 }
 
-impl Text {
-    pub(crate) fn into_elem(self) -> elem::Text {
-        elem::Text::new(self.text)
+#[doc(hidden)]
+#[derive(FromPyObject)]
+pub enum ElementOrText {
+    Element(Element),
+    Text(String),
+}
+
+impl PushElem for ElementOrText {
+    fn push_to(elem: Self, vec: &mut Vec<ricq::msg::MessageElem>) {
+        match elem {
+            ElementOrText::Element(elem) => PushElem::push_to(elem, vec),
+            ElementOrText::Text(text) => PushElem::push_to(elem::Text::new(text), vec),
+        }
+    }
+}
+
+/// 消息元素基类。
+#[pyclass(subclass)]
+pub struct ElementBase {}
+
+#[pymethods]
+impl ElementBase {
+    #[new]
+    fn new() -> PyResult<Self> {
+        Err(PyTypeError::new_err("ElementBase is abstract"))
     }
 }
 
@@ -67,57 +60,134 @@ impl Text {
 ///
 /// # Python
 /// ```python
-/// class At(TypedDict):
-///     type: Literal["at"]
-///     target: int
+/// class At():
+///     @property
+///     def target(self) -> int: ...
 /// ```
+#[pyclass]
+#[derive(Clone)]
 pub struct At {
-    target: i64,
+    /// 被 At 的 QQ 号。
+    #[pyo3(get)]
+    pub target: i64,
 }
 
-impl FromPyObject<'_> for At {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
-        let target = obj.get_item("target")?.extract()?;
-        Ok(Self { target })
-    }
-}
-
+#[pymethods]
 impl At {
-    pub(crate) fn into_elem(self) -> elem::At {
-        elem::At::new(self.target)
+    /// 构造 At 消息元素。
+    ///
+    /// # Arguments
+    /// * `target` - 被 At 的 QQ 号。
+    #[new]
+    pub fn new(target: i64) -> Self {
+        Self { target }
     }
 }
 
-/// Face。
+impl From<At> for elem::At {
+    fn from(at: At) -> Self {
+        Self::new(at.target)
+    }
+}
+
+/// 表情。
 ///
 /// # Python
 /// ```python
 /// class Face(TypedDict):
-///     type: Literal["face"]
-///     id: int | None
-///     name: str | None
+///     ...
 /// ```
+#[pyclass]
+#[derive(Clone)]
 pub struct Face {
-    id: Option<i32>,
-    name: Option<String>,
+    elem: elem::Face,
 }
 
-impl FromPyObject<'_> for Face {
-    fn extract(obj: &PyAny) -> PyResult<Self> {
-        let id = obj.get_item("id")?.extract()?;
-        let name = obj.get_item("name")?.extract()?;
-        Ok(Self { id, name })
+#[pymethods]
+impl Face {
+    /// 构造表情消息元素。
+    ///
+    /// # Python
+    /// ```python
+    /// @overload
+    /// def __init__(self, id: int, /) -> None: ...
+    /// @overload
+    /// def __init__(self, name: str, /) -> None: ...
+    /// @overload
+    /// def __init__(self, *, id: int | None = None, name: str | None = None) -> None: ...
+    /// ```
+    #[new]
+    #[args(args = "*", kwargs = "**")]
+    pub fn new(args: &PyTuple, kwargs: Option<&PyDict>) -> PyResult<Self> {
+        match args.len() {
+            0 => {
+                let id = kwargs
+                    .and_then(|kwargs| kwargs.get_item("id"))
+                    .map(|id| id.extract())
+                    .transpose()?;
+                if let Some(id) = id {
+                    return Ok(Self {
+                        elem: elem::Face::new(id),
+                    });
+                }
+                let name = kwargs
+                    .and_then(|kwargs| kwargs.get_item("name"))
+                    .map(|name| name.extract())
+                    .transpose()?;
+                if let Some(name) = name {
+                    let elem = elem::Face::new_from_name(name)
+                        .ok_or_else(|| PyTypeError::new_err("invalid face name"))?;
+                    return Ok(Self { elem });
+                }
+                Err(PyTypeError::new_err(
+                    "missing required argument 'id' or 'name'",
+                ))
+            }
+            1 => {
+                let id_or_name = args.get_item(0)?;
+                if id_or_name.is_instance_of::<PyString>()? {
+                    let name = id_or_name.extract()?;
+                    let elem = elem::Face::new_from_name(name)
+                        .ok_or_else(|| PyTypeError::new_err("invalid face name"))?;
+                    Ok(Self { elem })
+                } else {
+                    let id = id_or_name.extract()?;
+                    Ok(Self {
+                        elem: elem::Face::new(id),
+                    })
+                }
+            }
+            _ => Err(PyTypeError::new_err("expected at most 1 arguments")),
+        }
+    }
+
+    /// 表情 id。
+    ///
+    /// # Python
+    /// ```python
+    /// @property
+    /// def id(self) -> int: ...
+    /// ```
+    #[getter]
+    pub fn id(&self) -> i32 {
+        self.elem.index
+    }
+
+    /// 表情名称。
+    ///
+    /// # Python
+    /// ```python
+    /// @property
+    /// def name(self) -> str: ...
+    /// ```
+    #[getter]
+    pub fn name(&self) -> String {
+        self.elem.name.to_owned()
     }
 }
 
-impl Face {
-    pub(crate) fn into_elem(self) -> Option<elem::Face> {
-        if let Some(id) = self.id {
-            Some(elem::Face::new(id))
-        } else if let Some(name) = self.name {
-            elem::Face::new_from_name(&name)
-        } else {
-            None
-        }
+impl From<Face> for elem::Face {
+    fn from(face: Face) -> Self {
+        face.elem
     }
 }
