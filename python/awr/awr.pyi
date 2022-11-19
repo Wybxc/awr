@@ -4,6 +4,7 @@ from typing import Any, Iterator, Literal, Sequence, overload
 # lib.rs
 
 __version__: str
+__build__: dict[str, Any]
 
 def init(module: Any) -> None:
     """初始化 AWR 环境：

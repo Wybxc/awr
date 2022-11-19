@@ -20,6 +20,7 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.17", features = ["extension-module", "anyhow"] }
 pyo3-asyncio = { version = "0.17", features = ["tokio-runtime"] }
+pyo3-built = "0.4"
 ricq = "0.1.17"
 ricq-core = "0.1"
 tokio = { version = "1", features = ["rt", "fs"] }
@@ -40,6 +41,9 @@ rqrr = "0.5"
 qrcode = "0.12"
 image = "0.24"
 either = "1.8.0"
+
+[build-dependencies]
+built = { version = "0.5", features = ["chrono"] }
 
 [package.metadata.maturin]
 python-source = "python"

@@ -27,6 +27,7 @@
 #![deny(missing_docs)]
 
 use pyo3::prelude::*;
+use pyo3_built::pyo3_built;
 
 use tracing::info;
 
@@ -60,12 +61,19 @@ pub fn init(module: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
+/// 构建信息。
+#[allow(dead_code)]
+pub mod build {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
 #[pymodule]
 #[doc(hidden)]
-pub fn awr(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn awr(py: Python, m: &PyModule) -> PyResult<()> {
     // 初始化
     m.add_function(wrap_pyfunction!(init, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add("__build__", pyo3_built!(py, build))?;
     m.add_function(wrap_pyfunction!(loguru::getframe, m)?)?;
     // 登录方式
     m.add_class::<login::LoginMethod>()?;
