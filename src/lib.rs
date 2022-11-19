@@ -25,7 +25,6 @@
 //! [`ricq`]: https://docs.rs/ricq/latest/ricq/
 
 #![deny(missing_docs)]
-// #![allow(clippy::borrow_deref_ref)] // TODO: Remove this line when pyo3-asyncio is updated to 0.17
 
 use pyo3::prelude::*;
 
@@ -36,7 +35,6 @@ mod device;
 pub mod login;
 mod loguru;
 pub mod message;
-// pub mod selector;
 mod utils;
 
 const LOGO: &str = r#"
@@ -62,7 +60,6 @@ pub fn init(module: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-/// Avilla with Ricq.
 #[pymodule]
 #[doc(hidden)]
 pub fn awr(_py: Python, m: &PyModule) -> PyResult<()> {

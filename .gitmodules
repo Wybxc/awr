@@ -1,4 +1,0 @@
-[submodule "avilla"]
-	path = avilla
-	branch = master
-	url = https://github.com/GraiaProject/Avilla.git

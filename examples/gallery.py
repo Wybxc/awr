@@ -1,8 +1,9 @@
 import asyncio
 import os
 
-import awr
 from loguru import logger
+
+import awr
 
 # 登录账号
 account = os.environ.get("QQ_ACCOUNT")
