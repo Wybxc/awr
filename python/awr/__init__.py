@@ -6,9 +6,15 @@ __build__ = _awr.__build__
 
 from .awr import At, Client, Dynamic, Face, MessageContent, Password
 
+try:
+    from .awr import QrCode
+except ImportError:
+    pass
+
 __all__ = [
     "Client",
     "Password",
+    "QrCode",
     "Dynamic",
     "At",
     "Face",

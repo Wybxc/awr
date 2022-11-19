@@ -78,7 +78,10 @@ pub fn awr(py: Python, m: &PyModule) -> PyResult<()> {
     // 登录方式
     m.add_class::<login::LoginMethod>()?;
     m.add_class::<login::Password>()?;
-    m.add_class::<login::QrCode>()?;
+    #[cfg(feature = "qrcode")]
+    {
+        m.add_class::<login::QrCode>()?;
+    }
     m.add_class::<login::Dynamic>()?;
     // 客户端
     m.add_class::<client::Client>()?;

@@ -33,10 +33,8 @@
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
 };
 
-use bytes::Bytes;
 use pyo3::prelude::*;
 
 use anyhow::{anyhow, bail, Result};
@@ -50,12 +48,15 @@ use ricq::{
     handler::DefaultHandler,
     version::get_version,
     Client, Device, LoginDeviceLocked, LoginNeedCaptcha, LoginResponse, LoginSuccess,
-    LoginUnknownStatus, Protocol, QRCodeConfirmed, QRCodeImageFetch, QRCodeState,
+    LoginUnknownStatus, Protocol,
 };
-use tokio::{task::JoinHandle, time::sleep};
+use tokio::task::JoinHandle;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
 use crate::utils::{py_future, retry};
+
+#[cfg(feature = "qrcode")]
+pub use self::qrcode_login::*;
 
 /// 登录方式。
 #[pyclass(subclass)]
@@ -169,62 +170,6 @@ impl Password {
     }
 }
 
-/// 二维码登录（仅支持手表协议）。
-#[pyclass(extends=LoginMethod)]
-pub struct QrCode {}
-
-#[pymethods]
-impl QrCode {
-    /// 构造二维码登录方式。
-    ///
-    /// # Arguments
-    /// - `protocol` - 客户端协议。
-    ///
-    /// # Python
-    /// ```python
-    /// def __init__(self) -> None: ...
-    /// ```
-    #[new]
-    pub fn new() -> PyResult<PyClassInitializer<Self>> {
-        Ok(PyClassInitializer::from(LoginMethod::new("watch".to_string())?).add_subclass(Self {}))
-    }
-
-    /// 登录到指定的账号。
-    ///
-    /// # Arguments
-    /// - `uin` - 用户的 QQ 号。
-    /// - `data_folder` - 数据目录。
-    ///
-    /// # Python
-    /// ```python
-    /// async def login(self, uin: int, data_folder: str) -> Client: ...
-    /// ```
-    pub fn login<'py>(
-        self_: PyRef<'py, Self>,
-        py: Python<'py>,
-        uin: i64,
-        mut data_folder: PathBuf,
-    ) -> PyResult<&'py PyAny> {
-        let protocol = self_.as_ref().protocol.clone();
-        py_future(py, async move {
-            data_folder.push(uin.to_string());
-            tokio::fs::create_dir_all(&data_folder).await?;
-
-            let device = load_device_json(uin, data_folder.clone()).await?;
-            let (client, alive) = prepare_client(device, protocol).await?;
-
-            if !try_token_login(&client, data_folder.clone()).await? {
-                qrcode_login(&client, uin).await?;
-            }
-
-            // 注册客户端，启动心跳。
-            after_login(&client).await;
-            save_token(&client, data_folder.clone()).await?;
-            Ok(crate::client::Client::new(client, alive, data_folder).await)
-        })
-    }
-}
-
 /// 运行时选择登录方式。
 ///
 /// 运行时将在**终端**中由用户选择登录方式。
@@ -286,9 +231,13 @@ impl Dynamic {
             let login_method = {
                 let login_method = Question::select("login_method")
                     .message(format!("请选择账号 {uin} 的登录方式："))
-                    .choice("密码登录")
-                    .choice("二维码登录")
-                    .build();
+                    .choice("密码登录");
+                let login_method = if cfg!(feature = "qrcode") {
+                    login_method.choice("二维码登录")
+                } else {
+                    login_method
+                };
+                let login_method = login_method.build();
                 requestty::prompt_one(login_method)
                     .map_err(anyhow::Error::new)?
                     .as_list_item()
@@ -347,6 +296,7 @@ impl Dynamic {
 
                         password_login(&client, uin, password, false).await?;
                     }
+                    #[cfg(feature = "qrcode")]
                     1 => {
                         // 二维码登录
                         qrcode_login(&client, uin).await?;
@@ -441,20 +391,6 @@ async fn try_token_login(client: &Client, mut data_folder: PathBuf) -> Result<bo
     }
 }
 
-/// 在控制台打印二维码。
-fn print_qrcode(qrcode: &Bytes) -> Result<String> {
-    let qrcode = image::load_from_memory(qrcode)?.to_luma8();
-    let mut qrcode = rqrr::PreparedImage::prepare(qrcode);
-    let grids = qrcode.detect_grids();
-    if grids.len() != 1 {
-        return Err(anyhow!("无法识别二维码"));
-    }
-    let (_, content) = grids[0].decode()?;
-    let qrcode = qrcode::QrCode::new(content)?;
-    let qrcode = qrcode.render::<qrcode::render::unicode::Dense1x2>().build();
-    Ok(qrcode)
-}
-
 /// 保存 Token，用于断线重连。
 async fn save_token(client: &Client, mut data_folder: PathBuf) -> Result<()> {
     let token = client.gen_token().await;
@@ -524,76 +460,6 @@ async fn password_login(client: &Client, uin: i64, password: String, md5: bool) 
     Ok(())
 }
 
-/// 二维码登录。
-async fn qrcode_login(client: &Client, uin: i64) -> Result<()> {
-    tracing::info!("使用二维码登录，uin={}", uin);
-
-    let mut resp = client.fetch_qrcode().await?;
-
-    let mut image_sig = Bytes::new();
-    loop {
-        match resp {
-            QRCodeState::ImageFetch(QRCodeImageFetch {
-                ref image_data,
-                ref sig,
-            }) => {
-                let qr = print_qrcode(image_data)?;
-                tracing::info!("请扫描二维码: \n{}", qr);
-                image_sig = sig.clone();
-            }
-            QRCodeState::WaitingForScan => {
-                tracing::debug!("等待二维码扫描")
-            }
-            QRCodeState::WaitingForConfirm => {
-                tracing::debug!("二维码已扫描，等待确认")
-            }
-            QRCodeState::Timeout => {
-                tracing::info!("二维码已超时，重新获取");
-                if let QRCodeState::ImageFetch(QRCodeImageFetch {
-                    ref image_data,
-                    ref sig,
-                }) = client.fetch_qrcode().await.expect("failed to fetch qrcode")
-                {
-                    let qr = print_qrcode(image_data)?;
-                    tracing::info!("请扫描二维码: \n{}", qr);
-                    image_sig = sig.clone();
-                }
-            }
-            QRCodeState::Confirmed(QRCodeConfirmed {
-                ref tmp_pwd,
-                ref tmp_no_pic_sig,
-                ref tgt_qr,
-                ..
-            }) => {
-                tracing::info!("二维码已确认");
-                let mut login_resp = client.qrcode_login(tmp_pwd, tmp_no_pic_sig, tgt_qr).await?;
-                if let LoginResponse::DeviceLockLogin { .. } = login_resp {
-                    login_resp = client.device_lock_login().await?;
-                }
-                if let LoginResponse::Success(LoginSuccess {
-                    ref account_info, ..
-                }) = login_resp
-                {
-                    tracing::info!("登录成功: {:?}", account_info);
-                    let real_uin = client.uin().await;
-                    if real_uin != uin {
-                        tracing::warn!("预期登录账号 {}，但实际登陆账号为 {}", uin, real_uin);
-                    }
-                    break;
-                }
-                bail!("登录失败，原因未知：{:?}", login_resp)
-            }
-            QRCodeState::Canceled => {
-                bail!("二维码已取消")
-            }
-        }
-        sleep(Duration::from_secs(5)).await;
-        resp = client.query_qrcode_result(&image_sig).await?;
-    }
-
-    Ok(())
-}
-
 /// 断线重连。
 pub(crate) async fn reconnect(
     client: &Arc<Client>,
@@ -653,4 +519,157 @@ pub(crate) async fn reconnect(
         },
     )
     .await
+}
+
+#[cfg(feature = "qrcode")]
+mod qrcode_login {
+    use super::*;
+    use bytes::Bytes;
+    use ricq::{QRCodeConfirmed, QRCodeImageFetch, QRCodeState};
+    use std::time::Duration;
+    use tokio::time::sleep;
+
+    /// 在控制台打印二维码。    
+    pub(super) fn print_qrcode(qrcode: &Bytes) -> Result<String> {
+        let qrcode = image::load_from_memory(qrcode)?.to_luma8();
+        let mut qrcode = rqrr::PreparedImage::prepare(qrcode);
+        let grids = qrcode.detect_grids();
+        if grids.len() != 1 {
+            return Err(anyhow!("无法识别二维码"));
+        }
+        let (_, content) = grids[0].decode()?;
+        let qrcode = qrcode::QrCode::new(content)?;
+        let qrcode = qrcode.render::<qrcode::render::unicode::Dense1x2>().build();
+        Ok(qrcode)
+    }
+
+    /// 二维码登录（仅支持手表协议）。
+    #[pyclass(extends=LoginMethod)]
+    pub struct QrCode {}
+
+    #[pymethods]
+    impl QrCode {
+        /// 构造二维码登录方式。
+        ///
+        /// # Arguments
+        /// - `protocol` - 客户端协议。
+        ///
+        /// # Python
+        /// ```python
+        /// def __init__(self) -> None: ...
+        /// ```
+        #[new]
+        pub fn new() -> PyResult<PyClassInitializer<Self>> {
+            Ok(
+                PyClassInitializer::from(LoginMethod::new("watch".to_string())?)
+                    .add_subclass(Self {}),
+            )
+        }
+
+        /// 登录到指定的账号。
+        ///
+        /// # Arguments
+        /// - `uin` - 用户的 QQ 号。
+        /// - `data_folder` - 数据目录。
+        ///
+        /// # Python
+        /// ```python
+        /// async def login(self, uin: int, data_folder: str) -> Client: ...
+        /// ```
+        pub fn login<'py>(
+            self_: PyRef<'py, Self>,
+            py: Python<'py>,
+            uin: i64,
+            mut data_folder: PathBuf,
+        ) -> PyResult<&'py PyAny> {
+            let protocol = self_.as_ref().protocol.clone();
+            py_future(py, async move {
+                data_folder.push(uin.to_string());
+                tokio::fs::create_dir_all(&data_folder).await?;
+
+                let device = load_device_json(uin, data_folder.clone()).await?;
+                let (client, alive) = prepare_client(device, protocol).await?;
+
+                if !try_token_login(&client, data_folder.clone()).await? {
+                    qrcode_login(&client, uin).await?;
+                }
+
+                // 注册客户端，启动心跳。
+                after_login(&client).await;
+                save_token(&client, data_folder.clone()).await?;
+                Ok(crate::client::Client::new(client, alive, data_folder).await)
+            })
+        }
+    }
+
+    /// 二维码登录。    
+    pub(super) async fn qrcode_login(client: &Client, uin: i64) -> Result<()> {
+        tracing::info!("使用二维码登录，uin={}", uin);
+
+        let mut resp = client.fetch_qrcode().await?;
+
+        let mut image_sig = Bytes::new();
+        loop {
+            match resp {
+                QRCodeState::ImageFetch(QRCodeImageFetch {
+                    ref image_data,
+                    ref sig,
+                }) => {
+                    let qr = print_qrcode(image_data)?;
+                    tracing::info!("请扫描二维码: \n{}", qr);
+                    image_sig = sig.clone();
+                }
+                QRCodeState::WaitingForScan => {
+                    tracing::debug!("等待二维码扫描")
+                }
+                QRCodeState::WaitingForConfirm => {
+                    tracing::debug!("二维码已扫描，等待确认")
+                }
+                QRCodeState::Timeout => {
+                    tracing::info!("二维码已超时，重新获取");
+                    if let QRCodeState::ImageFetch(QRCodeImageFetch {
+                        ref image_data,
+                        ref sig,
+                    }) = client.fetch_qrcode().await.expect("failed to fetch qrcode")
+                    {
+                        let qr = print_qrcode(image_data)?;
+                        tracing::info!("请扫描二维码: \n{}", qr);
+                        image_sig = sig.clone();
+                    }
+                }
+                QRCodeState::Confirmed(QRCodeConfirmed {
+                    ref tmp_pwd,
+                    ref tmp_no_pic_sig,
+                    ref tgt_qr,
+                    ..
+                }) => {
+                    tracing::info!("二维码已确认");
+                    let mut login_resp =
+                        client.qrcode_login(tmp_pwd, tmp_no_pic_sig, tgt_qr).await?;
+                    if let LoginResponse::DeviceLockLogin { .. } = login_resp {
+                        login_resp = client.device_lock_login().await?;
+                    }
+                    if let LoginResponse::Success(LoginSuccess {
+                        ref account_info, ..
+                    }) = login_resp
+                    {
+                        tracing::info!("登录成功: {:?}", account_info);
+                        let real_uin = client.uin().await;
+                        if real_uin != uin {
+                            tracing::warn!("预期登录账号 {}，但实际登陆账号为 {}", uin, real_uin);
+                        }
+                        break;
+                    }
+                    bail!("登录失败，原因未知：{:?}", login_resp)
+                }
+                QRCodeState::Canceled => {
+                    bail!("二维码已取消")
+                }
+            }
+            sleep(Duration::from_secs(5)).await;
+            resp = client.query_qrcode_result(&image_sig).await?;
+        }
+
+        Ok(())
+    }
 }
