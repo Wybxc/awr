@@ -1,7 +1,7 @@
 use std::{ops::DerefMut, sync::Arc, time::Duration};
 
 use anyhow::Result;
-use async_trait::async_trait;
+use futures_util::Future;
 use tokio::{sync::Mutex, time::Instant};
 
 use super::friend_list::FriendList;
@@ -47,10 +47,11 @@ pub struct Cached<T: Cacheable> {
 }
 
 /// 可缓存的值。
-#[async_trait]
+// #[async_trait]
 pub trait Cacheable: Clone {
+    type FetchFuture: Future<Output = Result<Self>>;
     /// 从远程获取值。
-    async fn fetch(client: Arc<ClientImpl>) -> Result<Self>;
+    fn fetch(client: Arc<ClientImpl>) -> Self::FetchFuture;
 }
 
 impl<T: Cacheable> Cached<T> {

@@ -5,7 +5,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
-use async_trait::async_trait;
+use futures_util::Future;
 use pyo3::{prelude::*, types::*};
 use ricq::structs::{FriendGroupInfo, FriendInfo};
 
@@ -155,11 +155,12 @@ impl FriendList {
     }
 }
 
-#[async_trait]
 impl Cacheable for FriendList {
+    type FetchFuture = impl Future<Output = Result<Self>>;
+
     /// 请求获取好友列表。
-    async fn fetch(client: Arc<ClientImpl>) -> Result<Self> {
-        client.get_friend_list().await
+    fn fetch(client: Arc<ClientImpl>) -> Self::FetchFuture {
+        async { client.get_friend_list().await }
     }
 }
 

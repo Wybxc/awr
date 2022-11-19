@@ -25,6 +25,7 @@
 //! [`ricq`]: https://docs.rs/ricq/latest/ricq/
 
 #![deny(missing_docs)]
+#![feature(type_alias_impl_trait)]
 
 use pyo3::prelude::*;
 use pyo3_built::pyo3_built;
