@@ -1455,9 +1455,9 @@ dependencies = [
 
 [[package]]
 name = "ricq-core"
-version = "0.1.17"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1ea207d0ce27db1173b0600a7c459de46931492c5f1168af4f23f29ee2804ef"
+checksum = "9921e29625c65fab984c532382e8954b5de34f83139dfd371aeb59ccb9f3a310"
 dependencies = [
  "byteorder",
  "bytes",
