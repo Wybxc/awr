@@ -24,20 +24,21 @@
 //!
 //! [`ricq`]: https://docs.rs/ricq/latest/ricq/
 
-#![deny(missing_docs)]
-#![feature(type_alias_impl_trait)]
+#![feature(try_blocks)]
 
 use pyo3::prelude::*;
 use pyo3_built::pyo3_built;
 
 use tracing::info;
 
+#[macro_use]
+mod utils;
+
 pub mod client;
-mod device;
+// mod device;
 pub mod login;
 mod loguru;
-pub mod message;
-mod utils;
+// pub mod message;
 
 const LOGO: &str = r#"
  █████╗ ██╗    ██╗██████╗ 
@@ -69,6 +70,7 @@ pub mod build {
 }
 
 #[pymodule]
+#[pyo3(name = "_awr")]
 #[doc(hidden)]
 pub fn awr(py: Python, m: &PyModule) -> PyResult<()> {
     // 初始化
@@ -76,20 +78,17 @@ pub fn awr(py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add("__build__", pyo3_built!(py, build))?;
     m.add_function(wrap_pyfunction!(loguru::getframe, m)?)?;
-    // 登录方式
-    m.add_class::<login::LoginMethod>()?;
-    m.add_class::<login::Password>()?;
-    #[cfg(feature = "qrcode")]
-    {
-        m.add_class::<login::QrCode>()?;
-    }
-    m.add_class::<login::Dynamic>()?;
+    // 登录
+    m.add_function(wrap_pyfunction!(login::login, m)?)?;
+    m.add_function(wrap_pyfunction!(login::login_with_password, m)?)?;
+    m.add_function(wrap_pyfunction!(login::login_with_password_md5, m)?)?;
+    m.add_function(wrap_pyfunction!(login::login_with_qrcode, m)?)?;
     // 客户端
     m.add_class::<client::Client>()?;
-    // 消息元素
-    m.add_class::<message::elements::At>()?;
-    m.add_class::<message::elements::Face>()?;
-    // 消息内容
-    m.add_class::<message::content::MessageContent>()?;
+    // // 消息元素
+    // m.add_class::<message::elements::At>()?;
+    // m.add_class::<message::elements::Face>()?;
+    // // 消息内容
+    // m.add_class::<message::content::MessageContent>()?;
     Ok(())
 }

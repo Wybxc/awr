@@ -2,8 +2,9 @@
 name = "awr"
 version = "0.1.0"
 authors = ["忘忧北萱草<wybxc@qq.com>"]
-license = "AGPL-3.0"
+license = "MPL-2.0"
 edition = "2021"
+publish = false
 include = [
     "/python",
     "/src",
@@ -13,47 +14,46 @@ include = [
     "!*.so",
 ]
 
+[workspace]
+members = ["libawr"]
+
+[workspace.package]
+readme = "README.md"
+license = "MPL-2.0"
+license-file = "LICENSE"
+
 [lib]
 name = "awr"
+test = false
+doc = false
 crate-type = ["cdylib"]
 
 [dependencies]
+libawr = { path = "libawr" }
 pyo3 = { version = "0.17", features = [
     "extension-module",
+    "multiple-pymethods",
     "anyhow",
     "abi3",
     "abi3-py38",
+    "nightly",
 ] }
 pyo3-asyncio = { version = "0.17", features = ["tokio-runtime"] }
 pyo3-built = "0.4"
+tokio = { version = "1", features = ["rt", "fs", "io-std"] }
 ricq = "0.1.19"
 ricq-core = "0.1"
-tokio = { version = "1", features = ["rt", "fs"] }
-tokio-util = { version = "0.7", features = ["codec"] }
-tokio-stream = "0.1"
-futures-util = "0.3"
 anyhow = "1.0"
+futures-util = "0.3"
+hex = "0.4.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3" }
-serde_json = "1"
-hex = "0.4.3"
-bytes = "1"
-rand = "0.8.5"
-rand_chacha = "0.3.1"
-either = "1.8.0"
-requestty = "0.5.0"
-rqrr = { version = "0.6", optional = true }
-qrcode = { version = "0.12", optional = true }
-image = { version = "0.24", optional = true }
 
 [build-dependencies]
 built = { version = "0.5", features = ["chrono"] }
 
-[features]
-qrcode = ["dep:rqrr", "dep:qrcode", "dep:image"]
-default = ["qrcode"]
-
 [package.metadata.maturin]
+name = "awr._awr"
 python-source = "python"
 
 [profile.release]

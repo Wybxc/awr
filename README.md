@@ -6,9 +6,9 @@
 [![GitHub Issues](https://img.shields.io/github/issues/Wybxc/awr?style=for-the-badge)](https://github.com/Wybxc/awr/issues)
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Wybxc/awr?style=for-the-badge)](https://github.com/Wybxc/awr/pulls)
 
-![Build Status](https://img.shields.io/github/workflow/status/Wybxc/awr/CI?style=for-the-badge)
-![LICENCE](https://img.shields.io/github/license/Wybxc/awr?style=for-the-badge)
-[![Docs Status](https://img.shields.io/github/workflow/status/Wybxc/awr/API%20Document?label=docs&style=for-the-badge)](https://awr-latest.netlify.app)
+![Build Status](https://img.shields.io/github/actions/workflow/status/Wybxc/awr/CI.yml?branch=main&style=for-the-badge)
+[![LICENCE](https://img.shields.io/github/license/Wybxc/awr?style=for-the-badge)](https://github.com/Wybxc/awr/blob/main/LICENSE)
+[![Docs Status](https://img.shields.io/docsrs/libawr?style=for-the-badge)](https://docs.rs/libawr)
 [![GitHub](https://img.shields.io/github/last-commit/Wybxc/awr?label=GitHub&style=for-the-badge)](https://github.com/Wybxc/awr)
 
 </div>
@@ -99,7 +99,7 @@ except KeyboardInterrupt:
 - [x] 获取群成员列表
 - [x] 获取好友列表/分组
 - [ ] 获取好友个性签名
-- [ ] 添加/删除/重命名好友分组
+- [x] 添加/删除/重命名好友分组
 - [ ] 群成员禁言/解除禁言
 - [ ] 踢出群成员
 - [ ] 戳一戳群友

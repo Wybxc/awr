@@ -5,7 +5,19 @@
     !function () { if ("undefined" != typeof Prism) { var n, s, a = ""; Prism.plugins.customClass = { add: function (s) { n = s }, map: function (n) { s = "function" == typeof n ? n : function (s) { return n[s] || s } }, prefix: function (n) { a = n || "" }, apply: t }, Prism.hooks.add("wrap", (function (e) { if (n) { var u = n({ content: e.content, type: e.type, language: e.language }); Array.isArray(u) ? e.classes.push.apply(e.classes, u) : u && e.classes.push(u) } (s || a) && (e.classes = e.classes.map((function (n) { return t(n, e.language) }))) })) } function t(n, t) { return a + (s ? s(n, t) : n) } }();
 </script>
 
-<script type="text/javascript">
+<script type="module">
+    import mermaid from "https://unpkg.com/mermaid@9.3.0/dist/mermaid.esm.min.mjs";
+    if (currentTheme) {
+        let theme = "defualt";
+        if (/.*(dark|ayu).*\.css/.test(currentTheme.href)) {
+            console.log("Dark theme detected!");
+            theme = "dark";
+        }
+        mermaid.initialize({ startOnLoad: false, theme });
+    } else {
+        console.error("No theme found!")
+    }
+
     Prism.plugins.customClass.map({
         "function": "fn",
         "class-name": "fn",
@@ -14,10 +26,14 @@
         "boolean": "macro",
         "operator": "kw-2"
     });
+
     window.addEventListener("DOMContentLoaded", function () {
         document.querySelectorAll("pre.language-python code").forEach(function (block) {
             block.parentNode.classList.add("rust");
             Prism.highlightElement(block);
         });
-    })
+        document.querySelectorAll("pre.language-mermaid").forEach(async function (block) {
+            block.innerHTML = await mermaid.render("mermaid", block.textContent);
+        });
+    });
 </script>

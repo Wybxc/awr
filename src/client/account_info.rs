@@ -1,47 +1,36 @@
 //! 账号信息。
-//!
-//! 更多信息参考 [`AccountInfo`]。
 
-use pyo3::{prelude::*, types::*};
+use pyo3::prelude::*;
 
-/// 账号信息。
-///
-/// # Python
-/// ```python
-/// class AccountInfo:
-///     @property
-///     def nickname(self) -> str: ...
-///     @property
-///     def age(self) -> int: ...
-///     @property
-///     def gender(self) -> int: ...
-/// ```
 #[pyclass]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AccountInfo {
-    /// 昵称。
-    #[pyo3(get)]
-    pub nickname: Py<PyString>,
-
-    /// 年龄。
-    #[pyo3(get)]
-    pub age: u8,
-
-    /// 性别。
-    #[pyo3(get)]
-    pub gender: u8,
+    pub(crate) inner: libawr::client::account_info::AccountInfo,
 }
 
-#[pymethods]
-impl AccountInfo {
-    fn __repr__(&self) -> String {
-        Python::with_gil(|py| {
-            format!(
-                "AccountInfo(nickname={:?}, age={:?}, gender={:?})",
-                self.nickname.as_ref(py).repr().unwrap(),
-                self.age,
-                self.gender
-            )
-        })
+impl From<libawr::client::account_info::AccountInfo> for AccountInfo {
+    fn from(inner: libawr::client::account_info::AccountInfo) -> Self {
+        Self { inner }
     }
 }
+
+impl_py_properties!(AccountInfo {
+    nickname: String => &str,
+    age: u8 => u8,
+    gender: u8 => u8,
+});
+
+#[pyclass]
+#[derive(Clone)]
+pub struct AccountInfoSelector {
+    pub(crate) inner: libawr::client::account_info::AccountInfoSelector,
+}
+
+impl From<libawr::client::account_info::AccountInfoSelector> for AccountInfoSelector {
+    fn from(inner: libawr::client::account_info::AccountInfoSelector) -> Self {
+        Self { inner }
+    }
+}
+
+impl_py_properties!(AccountInfoSelector {});
+impl_single_selector!(AccountInfoSelector, AccountInfo);

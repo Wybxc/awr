@@ -1,98 +1,67 @@
 //! 好友分组。
-//!
-//! 更多信息参考 [`FriendGroup`]。
 
 use std::sync::Arc;
 
 use pyo3::prelude::*;
-use ricq::structs::FriendGroupInfo;
 
-use super::ClientImpl;
+use crate::utils::py_future;
 
 /// 好友分组。
-///
-/// # Python
-/// ```python
-/// class FriendGroup: ...
-/// ```
 #[pyclass]
 #[derive(Clone)]
 pub struct FriendGroup {
-    #[allow(unused)] // TODO: remove this
-    pub(super) client: Arc<ClientImpl>,
-    pub(super) info: FriendGroupInfo,
+    pub(crate) inner: Arc<libawr::client::friend_group::FriendGroup>,
 }
 
+impl From<Arc<libawr::client::friend_group::FriendGroup>> for FriendGroup {
+    fn from(inner: Arc<libawr::client::friend_group::FriendGroup>) -> Self {
+        Self { inner }
+    }
+}
+
+impl_py_properties!(FriendGroup {
+    id: u8 => u8,
+    name: String => &str,
+    friend_count: i32 => i32,
+    online_count: i32 => i32,
+    seq_id: u8 => u8,
+});
+impl_remote_target!(FriendGroup, FriendGroupSelector);
+
+#[pyclass]
+#[derive(Clone)]
+pub struct FriendGroupSelector {
+    pub(crate) inner: libawr::client::friend_group::FriendGroupSelector,
+}
+
+impl From<libawr::client::friend_group::FriendGroupSelector> for FriendGroupSelector {
+    fn from(inner: libawr::client::friend_group::FriendGroupSelector) -> Self {
+        Self { inner }
+    }
+}
+
+impl_py_properties!(FriendGroupSelector {
+    id: u8 => u8,
+});
+impl_option_selector!(FriendGroupSelector, FriendGroup);
+
 #[pymethods]
-impl FriendGroup {
-    /// 好友分组 ID。
-    ///
-    /// # Python
-    /// ```python
-    /// @property
-    /// def id(self) -> int: ...
-    /// ```
-    #[getter]
-    pub fn id(&self) -> u8 {
-        self.info.group_id
+impl FriendGroupSelector {
+    /// 删除好友分组。
+    pub fn delete<'py>(&self, py: Python<'py>) -> PyResult<&'py PyAny> {
+        let inner = self.inner.clone();
+        py_future(py, async move {
+            inner.delete().await?;
+            Ok(())
+        })
     }
 
-    /// 好友分组名称。
-    ///
-    /// # Python
-    /// ```python
-    /// @property
-    /// def name(self) -> str: ...
-    /// ```
-    #[getter]
-    pub fn name(&self) -> &str {
-        &self.info.group_name
-    }
-
-    /// 好友分组中的好友数量。
-    ///
-    /// # Python
-    /// ```python
-    /// @property
-    /// def count(self) -> int: ...
-    /// ```
-    #[getter]
-    pub fn friend_count(&self) -> i32 {
-        self.info.friend_count
-    }
-
-    /// 分组中在线的好友数量。
-    ///
-    /// # Python
-    /// ```python
-    /// @property
-    /// def online_count(self) -> int: ...
-    /// ```
-    #[getter]
-    pub fn online_count(&self) -> i32 {
-        self.info.online_friend_count
-    }
-
-    /// TODO: 未知
-    ///
-    /// # Python
-    /// ```python
-    /// @property
-    /// def seq_id(self) -> int: ...
-    /// ```
-    #[getter]
-    pub fn seq_id(&self) -> u8 {
-        self.info.seq_id
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "FriendGroupInfo(id={:?}, name={:?}, friend_count={:?}, online_count={:?}, seq_id={:?})",
-            self.id(),
-            self.name(),
-            self.friend_count(),
-            self.online_count(),
-            self.seq_id()
-        )
+    /// 重命名好友分组。
+    pub fn rename<'py>(&self, py: Python<'py>, name: String) -> PyResult<&'py PyAny> {
+        let inner = self.inner.clone();
+        py_future(py, async move {
+            inner.rename(name).await?;
+            Ok(())
+        })
     }
 }

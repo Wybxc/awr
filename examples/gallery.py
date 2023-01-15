@@ -6,14 +6,19 @@ from loguru import logger
 import awr
 
 # 登录账号
-account = os.environ.get("QQ_ACCOUNT")
+account = os.environ.get("AWR_ACCOUNT")
 if not account:
-    logger.error("QQ_ACCOUNT not set")
+    logger.error("AWR_ACCOUNT not set")
+    exit(1)
+account = int(account)
+
+password = os.environ.get("AWR_PASSWORD")
+if not password:
+    logger.error("AWR_PASSWORD not set")
     exit(1)
 
 # 测试用好友账号
 test_account = os.environ.get("QQ_TEST_ACCOUNT")
-
 
 async def main():
     client = await awr.Dynamic().login(int(account), "./bots")

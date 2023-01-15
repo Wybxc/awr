@@ -6,8 +6,6 @@ use std::{fmt::Write, sync::Arc};
 use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
-use crate::py_dict;
-
 /// 初始化日志输出。
 pub(crate) fn init(module: &PyModule) -> PyResult<()> {
     // 输出桥接

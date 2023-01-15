@@ -1,2 +1,2 @@
 [build]
-rustdocflags = ["--html-after-content", "docs/prism.html"]
+rustdocflags = ["--html-after-content", "docs/custom.html"]
