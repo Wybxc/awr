@@ -13,6 +13,10 @@
 
 </div>
 
+**通知**: 本项目目前暂停开发。对于 Python 用户，请移步 [ichika](https://github.com/BlueGlassBlock/Ichika)；对于 Rust 用户，请移步 [chocho](https://github.com/Wybxc/chocho)。
+
+---
+
 基于 [`ricq`](https://github.com/lz1998/ricq) 包装，供 Python 使用的 QQ 无头客户端。
 
 ## 开始
