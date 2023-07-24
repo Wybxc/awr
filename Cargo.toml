@@ -40,7 +40,7 @@ hex = "0.4.3"
 bytes = "1"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
-either = "1.8.0"
+either = "1.9.0"
 requestty = "0.5.0"
 rqrr = { version = "0.6", optional = true }
 qrcode = { version = "0.12", optional = true }
