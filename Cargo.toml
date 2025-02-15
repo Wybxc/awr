@@ -1,6 +1,6 @@
 [package]
 name = "awr"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["忘忧北萱草<wybxc@qq.com>"]
 license = "AGPL-3.0"
 edition = "2021"
@@ -58,3 +58,6 @@ python-source = "python"
 
 [profile.release]
 lto = true
+
+[badges.maintenance]
+status = "deprecated"
